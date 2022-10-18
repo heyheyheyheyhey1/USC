@@ -20,12 +20,8 @@ for classifier in classifiers:
             data_frame = tmp
     data_frame /= rank_nums
     data_frame.iloc[:, 0] = classifier
-    data_frame.rename(columns={'0':'Classifer','1':'value'})
+    data_frame.rename(columns={'0': 'Classifier', '1': 'value'})
     data_frames.append(data_frame)
 
-with open(os.path.join(data_out_dir, data_out_name),'w') as f:
-    data_frames.values
-    for data_frame in data_frames:
-        v = data_frame.values
-        f.write(v)
-f.close()
+out = pandas.concat(data_frames)
+out.to_csv(os.path.join(data_out_dir, data_out_name), index=False, sep='\t')
