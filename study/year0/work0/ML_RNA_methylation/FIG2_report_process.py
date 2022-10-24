@@ -6,10 +6,9 @@ report_datas = []
 for report_dir in os.listdir(src_dir):
     report = pandas.read_csv(os.path.join(src_dir, report_dir), sep="\t")
     report.sort_values("Count", ascending=False, inplace=True)
-    report = report.head(10)
+    report = report.head(30)
     report["Term"] = [t.split("~")[-1] for t in report["Term"]]
     report["Classifier"] = report_dir.split("_")[0]
     report_datas.append(report)
 report = pandas.concat(report_datas)
-report.sort_values("Count", ascending=False,inplace=True)
 report.to_csv(os.path.join("data", data_out_name), sep='\t', index=False)

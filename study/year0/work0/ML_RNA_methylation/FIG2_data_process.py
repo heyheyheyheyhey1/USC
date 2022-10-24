@@ -20,8 +20,8 @@ for classifier in classifiers:
         else:
             data_frame = tmp
     data_frame /= rank_nums
-    data_frame.sort_values(by='1',ascending=False,inplace=True)
-    data_frame = data_frame.loc[~data_frame.index.isin(known_RNMTS)].head(100)
+    data_frame.sort_values(by='1', ascending=False, inplace=True)
+    data_frame = data_frame.loc[~data_frame.index.isin(known_RNMTS)].head(270)
     data_frame["0"] = classifier
     data_frames.append(data_frame)
 
