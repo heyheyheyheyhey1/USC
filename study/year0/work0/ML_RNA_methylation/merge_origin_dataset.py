@@ -18,7 +18,8 @@ def get_dataframe(dataset_name):
     if dataset_name in ['GO_BP','GO_MF','Interpro_predDomains','TISSUES_curatProtein','KEGG_Pathway'] :
         dataset = dataset.rename(columns=dataset.iloc[0])
     dataset = dataset.iloc[2:-1,2:-1]
-    dataset = dataset.loc[:,(f'{dataset_name}_'+dataset.columns).isin(full_feature_names)]
+    # dataset = dataset.loc[:,(f'{dataset_name}_'+dataset.columns).isin(full_feature_names)]
+    dataset.columns=(dataset_name +"_"+ dataset.columns).values
     if len(dataset.columns) == 0:
         print(f'find empty dataset: {dataset_name}\n')
     return dataset
@@ -29,5 +30,6 @@ for dataset_name in dataset_dirs:
     datasets.append(dataset)
 
 dataset_combined = pandas.concat(datasets,axis=1)
+# dataset_combined.fillna(0)
 
 dataset_combined.to_csv(os.path.join('data', 'my_combined_data.tsv'), index=True, sep="\t", header=True)
