@@ -41,9 +41,14 @@ def lipinski(smiles, verbose=False):
 
     return descriptors
 
-#IC50 PIC50单位转换
-
 
 df_lipinski = lipinski(df.canonical_smiles)
-pass
+
 df_combined = pd.concat([df, df_lipinski], axis=1)
+
+# IC50 PIC50单位转换
+
+df_combined["standard_value_norm"] = [100000000 if row.standard_value > 100000000 else row.standard_value for (idx, row)
+                                      in df_combined.iterrows()]  # 缩小最大标准值
+
+pass
