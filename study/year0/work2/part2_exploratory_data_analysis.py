@@ -6,6 +6,7 @@ import numpy as np
 
 DATA_DIR = "data"
 PROCESSED_BIOACTIVITY_DATA = "bioactivity_data_preprocessed.csv"
+BIOACTIVITY_DATA_OUT = "bioactivity_data.csv"
 df = pd.read_csv(os.path.join(DATA_DIR, PROCESSED_BIOACTIVITY_DATA))
 
 
@@ -51,4 +52,20 @@ df_combined = pd.concat([df, df_lipinski], axis=1)
 df_combined["standard_value_norm"] = [100000000 if row.standard_value > 100000000 else row.standard_value for (idx, row)
                                       in df_combined.iterrows()]  # 缩小最大标准值
 
-pass
+
+def pIC50(input):
+    pIC50 = []
+    for i in input['standard_value_norm']:
+        molar = i * (10 ** -9)  # Converts nM to M
+        pIC50.append(-np.log10(molar))
+
+    input['pIC50'] = pIC50
+    x = input.drop('standard_value_norm', axis=1)
+    x.drop('standard_value', axis=1, inplace=True)
+    return x
+
+
+df_out = pIC50(df_combined)
+# df_out = df_out[df_out["class"] != "intermediate"]
+
+df_out.to_csv(os.path.join(DATA_DIR, BIOACTIVITY_DATA_OUT),index = False)

@@ -33,12 +33,12 @@ print(len(df), len(df2))
 for idx, row in df2.iterrows():
     v = float(row.standard_value)
     if v >= 10000:
-        df2.loc[idx, "bioactivity_class"] = "inactive"
+        df2.loc[idx, "class"] = "inactive"
     elif v < 1000:
-        df2.loc[idx, "bioactivity_class"] = "active"
+        df2.loc[idx, "class"] = "active"
     else:
-        df2.loc[idx, "bioactivity_class"] = "intermediate"
+        df2.loc[idx, "class"] = "intermediate"
 
-cb_columns = ["molecule_chembl_id", "canonical_smiles", "standard_value", "bioactivity_class"]
+cb_columns = ["molecule_chembl_id", "canonical_smiles", "standard_value", "class"]
 df3 = df2[cb_columns]
 df3.to_csv(os.path.join(DATA_DIR, PROCESSED_BIOACTIVITY_DATA), index=False)
