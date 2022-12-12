@@ -10,6 +10,7 @@ from imblearn.over_sampling import *
 from sklearn.model_selection import *
 from sklearn.svm import SVC
 from sklearn.metrics import *
+
 harmonizome_data = "harmonizome_data_combined.tsv"
 selected_data = "selected_dataset.tsv"
 rnmts = "RNMT.list"
@@ -37,15 +38,17 @@ train_x = train_dataset.iloc[:, 0:-1].values
 train_y = train_dataset.iloc[:, -1].values
 test_x = test_dataset.iloc[:, 0:-1].values
 test_y = test_dataset.iloc[:, -1].values
+all_x = selected_data.iloc[:,0:-1].values
+all_y = selected_data.iloc[:,-1].values
+
 
 print("positive num before oversample: %d" % (len(train_y)))
-train_x_os, train_y_os = BorderlineSMOTE(random_state=42,sampling_strategy={1:5000}).fit_resample(train_x, train_y)
+train_x_os, train_y_os = SMOTEN(random_state=42, sampling_strategy={1: 2000}).fit_resample(train_x, train_y)
 print("length after oversample: %d" % (len(train_x_os)))
 
 shuffle_idx = shuffle(range(len(train_x_os)))
 train_x_os = train_x_os[shuffle_idx]
 train_y_os = train_y_os[shuffle_idx]
-
 
 TUNING_DIR = os.path.join("tuning")
 RESULT_DIR = os.path.join("result")
@@ -54,10 +57,12 @@ if not os.path.exists(TUNING_DIR):
 
 if not os.path.exists(RESULT_DIR):
     os.makedirs(RESULT_DIR)
+
+
 def SVM_tuning(n, X_train, y_train):
     scores = ['accuracy']  # select scores e.g scores = ['recall', 'accuracy']
-    grid_param_svm = [{'kernel': ['rbf'], 'gamma': [1e-3, 1e-4], 'C': [1, 10, 100, 1000]},
-                      {'kernel': ['linear'], 'C': [1, 10, 100, 1000]}]
+    grid_param_svm = [{'kernel': ['rbf'], 'gamma': [13 - 2, 1e-3, 1e-4], 'C': [1, 10, 50, 100, 500, 1000]},
+                      {'kernel': ['linear'], 'C': [1, 10, 50, 100, 500, 1000]}]
     svm_tuning_info = open(os.path.join("tuning", f'SVM_tuning_{n}.txt'), "w")
     for score in scores:
         svm_tuning = GridSearchCV(SVC(random_state=3), grid_param_svm, cv=KFold(3, shuffle=True, random_state=3),
@@ -82,14 +87,14 @@ def SVM_tuning(n, X_train, y_train):
 
 
 def train_one_epoch(n, b):
-    X = train_x_os[n*b:n*b+b]
-    Y = train_y_os[n*b:n*b+b]
+    X = train_x_os[n * b:n * b + b]
+    Y = train_y_os[n * b:n * b + b]
 
-    tuning = SVM_tuning(n,X,Y)
-    scorings = {'accuracy' : make_scorer(accuracy_score),
-                'recall' : make_scorer(recall_score),
-                'precision' : make_scorer(precision_score),
-                'f1_score' : make_scorer(f1_score),
+    tuning = SVM_tuning(n, X, Y)
+    scorings = {'accuracy': make_scorer(accuracy_score),
+                'recall': make_scorer(recall_score),
+                'precision': make_scorer(precision_score),
+                'f1_score': make_scorer(f1_score),
                 'auc': 'roc_auc'}
     if tuning['kernel'] == 'rbf':
         SVM_model = SVC(C=tuning['C'],
@@ -103,16 +108,15 @@ def train_one_epoch(n, b):
                         probability=True,
                         random_state=5)
     scores = cross_validate(estimator=SVM_model, X=X, y=Y, cv=10, scoring=scorings, n_jobs=12)
-    model = SVM_model.fit(X,Y)
-    # pred_y = SVM_model.predict(test_x)
-    # accuracy = accuracy_score(test_y,pred_y)
-    # precision = precision_score(test_y, pred_y)
-    # recall = recall_score(test_y, pred_y)
-    # f1 = f1_score(test_y, pred_y)
-
+    model = SVM_model.fit(X, Y)
+    # pred_y = SVM_model.predict(all_x)
+    # accuracy = accuracy_score(all_y,pred_y)
+    # precision = precision_score(all_y, pred_y)
+    # recall = recall_score(all_y, pred_y)
+    # f1 = f1_score(all_y, pred_y)
 
     pickle.dump(model, open(os.path.join(TUNING_DIR, f'round_{n}.sav'), 'wb'))
-    if(n%10 == 0 ):
+    if (n % 10 == 0):
         # print(f"round_{n + 1} result :\n")
         # print(f'accuracy:{accuracy}')
         # print(f'precision:{precision}')
@@ -126,12 +130,14 @@ def train_one_epoch(n, b):
 
     return model
 
+
 def main():
     batch_size = 300
     pd.DataFrame(train_y_os).describe()
     epoch_num = int(len(train_x_os) / batch_size)
     for i in tqdm.tqdm(range(epoch_num)):
-        train_one_epoch(i,batch_size)
+        train_one_epoch(i, batch_size)
+
 
 if __name__ == "__main__":
     main()
