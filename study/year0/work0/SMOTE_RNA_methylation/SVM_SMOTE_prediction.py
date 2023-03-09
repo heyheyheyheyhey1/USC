@@ -19,36 +19,28 @@ selected_data = pd.read_csv(dataset_matrix, delimiter="\t", index_col=0, low_mem
 
 all_genes = selected_data.index.unique().to_list()
 positive_genes = [line.rstrip('\n') for line in open(os.path.join("data", rnmts))]
-negative_examples = set(all_genes).difference(positive_genes)  # 负样本
-negative_examples = shuffle(list(negative_examples))  # 随机
-test_positive_examples = sample(positive_genes, int(0.2 * len(positive_genes)))  # 取正样本20%作为测试
-test_negative_examples = sample(negative_examples, int(0.2 * len(negative_examples)))  # 测试负样本
-train_genes = list(set(all_genes).difference(set(test_negative_examples).union(test_positive_examples)))
-
-print("all genes num: %d\n" % (len(all_genes)))
-print("train genes num: %d\n" % (len(train_genes)))
-print("test genes num: %d\n" % (len(test_negative_examples) + len(test_positive_examples)))
+negative_genes = set(all_genes).difference(positive_genes)  # 负样本
 
 selected_data["Y"] = [1 if idx in positive_genes else 0 for idx in selected_data.index.to_list()]
-train_dataset = selected_data.loc[list(train_genes)].copy()
-test_dataset = selected_data.loc[list(set(all_genes).difference(train_genes))].copy()
+test_positive_genes = sample(positive_genes, int(0.2 * len(positive_genes)))  # 取正样本20%作为测试
+test_negative_genes = sample(negative_genes, int(0.2 * len(negative_genes)))  # 测试负样本
+train_positive_genes = set(positive_genes).difference(test_positive_genes)
+train_negative_genes = set(negative_genes).difference(test_negative_genes)
+train_positive_frame = selected_data.loc[list(train_positive_genes)]
+train_negative_frame = selected_data.loc[list(train_negative_genes)]
+
+print("all genes num: %d\n" % (len(all_genes)))
+print("test genes num: %d\n" % (len(test_negative_genes) + len(test_positive_genes)))
 
 random.seed(42)
-train_x = train_dataset.iloc[:, 0:-1].values
-train_y = train_dataset.iloc[:, -1].values
-test_x = test_dataset.iloc[:, 0:-1].values
-test_y = test_dataset.iloc[:, -1].values
-all_x = selected_data.iloc[:,0:-1].values
-all_y = selected_data.iloc[:,-1].values
 
+# print("positive num before oversample: %d" % (len(train_y)))
+# train_x_os, train_y_os = SMOTEN(random_state=42, sampling_strategy={1: 2000}).fit_resample(train_x, train_y)
+# print("length after oversample: %d" % (len(train_x_os)))
 
-print("positive num before oversample: %d" % (len(train_y)))
-train_x_os, train_y_os = SMOTEN(random_state=42, sampling_strategy={1: 2000}).fit_resample(train_x, train_y)
-print("length after oversample: %d" % (len(train_x_os)))
-
-shuffle_idx = shuffle(range(len(train_x_os)))
-train_x_os = train_x_os[shuffle_idx]
-train_y_os = train_y_os[shuffle_idx]
+# shuffle_idx = shuffle(range(len(train_x_os)))
+# train_x_os = train_x_os[shuffle_idx]
+# train_y_os = train_y_os[shuffle_idx]
 
 TUNING_DIR = os.path.join("tuning")
 RESULT_DIR = os.path.join("result")
@@ -61,8 +53,8 @@ if not os.path.exists(RESULT_DIR):
 
 def SVM_tuning(n, X_train, y_train):
     scores = ['accuracy']  # select scores e.g scores = ['recall', 'accuracy']
-    grid_param_svm = [{'kernel': ['rbf'], 'gamma': [13 - 2, 1e-3, 1e-4], 'C': [1, 10, 50, 100, 500, 1000]},
-                      {'kernel': ['linear'], 'C': [1, 10, 50, 100, 500, 1000]}]
+    grid_param_svm = [{'kernel': ['rbf'], 'gamma': [1e-2, 1e-3, 1e-4], 'C': [1, 10, 50, 100, 500, 1000,1500,2000,2500]},
+                      {'kernel': ['linear'], 'C': [1, 10, 50, 100, 500, 1000,1500,2000,2500]}]
     svm_tuning_info = open(os.path.join("tuning", f'SVM_tuning_{n}.txt'), "w")
     for score in scores:
         svm_tuning = GridSearchCV(SVC(random_state=3), grid_param_svm, cv=KFold(3, shuffle=True, random_state=3),
@@ -86,10 +78,7 @@ def SVM_tuning(n, X_train, y_train):
     return (svm_tuning.best_params_)
 
 
-def train_one_epoch(n, b):
-    X = train_x_os[n * b:n * b + b]
-    Y = train_y_os[n * b:n * b + b]
-
+def train_one_epoch(X, Y, n):
     tuning = SVM_tuning(n, X, Y)
     scorings = {'accuracy': make_scorer(accuracy_score),
                 'recall': make_scorer(recall_score),
@@ -116,7 +105,7 @@ def train_one_epoch(n, b):
     # f1 = f1_score(all_y, pred_y)
 
     pickle.dump(model, open(os.path.join(TUNING_DIR, f'round_{n}.sav'), 'wb'))
-    if (n % 10 == 0):
+    if (n % 3 == 0):
         # print(f"round_{n + 1} result :\n")
         # print(f'accuracy:{accuracy}')
         # print(f'precision:{precision}')
@@ -131,12 +120,24 @@ def train_one_epoch(n, b):
     return model
 
 
+def data_block_n(i, batch_size):
+    n_train = train_negative_frame.iloc[i * batch_size:i * batch_size + batch_size]
+    block = pd.concat([n_train,train_positive_frame],axis=0)
+    block_y = block.iloc[:, -1].values
+    block_x = block.iloc[:, 0:-1].values
+    os_x,os_y = SMOTEN(random_state=42).fit_resample(block_x, block_y)
+    out_x, out_y = shuffle(os_x,os_y)
+    return out_x, out_y
+
+
 def main():
-    batch_size = 300
-    pd.DataFrame(train_y_os).describe()
-    epoch_num = int(len(train_x_os) / batch_size)
+    os_rate = 0.6
+    ir = float(len(train_negative_genes) / len(train_positive_genes))
+    epoch_num = int(ir * os_rate)
+    batch_size = int(len(train_negative_genes) / epoch_num)
     for i in tqdm.tqdm(range(epoch_num)):
-        train_one_epoch(i, batch_size)
+        x, y = data_block_n(i, batch_size)
+        train_one_epoch(x, y, i)
 
 
 if __name__ == "__main__":
