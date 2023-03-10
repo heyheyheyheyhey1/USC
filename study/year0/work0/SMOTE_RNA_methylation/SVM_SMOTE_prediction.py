@@ -53,8 +53,8 @@ if not os.path.exists(RESULT_DIR):
 
 def SVM_tuning(n, X_train, y_train):
     scores = ['accuracy']  # select scores e.g scores = ['recall', 'accuracy']
-    grid_param_svm = [{'kernel': ['rbf'], 'gamma': [1e-2, 1e-3, 1e-4], 'C': [1, 10, 50, 100, 500, 1000,1500,2000,2500]},
-                      {'kernel': ['linear'], 'C': [1, 10, 50, 100, 500, 1000,1500,2000,2500]}]
+    grid_param_svm = [{'kernel': ['rbf'], 'gamma': [1e-1, 1e-2, 1e-3, 1e-4], 'C': range(1, 1500)},
+                      {'kernel': ['linear'], 'C': range(1, 1500)}]
     svm_tuning_info = open(os.path.join("tuning", f'SVM_tuning_{n}.txt'), "w")
     for score in scores:
         svm_tuning = GridSearchCV(SVC(random_state=3), grid_param_svm, cv=KFold(3, shuffle=True, random_state=3),
@@ -122,11 +122,11 @@ def train_one_epoch(X, Y, n):
 
 def data_block_n(i, batch_size):
     n_train = train_negative_frame.iloc[i * batch_size:i * batch_size + batch_size]
-    block = pd.concat([n_train,train_positive_frame],axis=0)
+    block = pd.concat([n_train, train_positive_frame], axis=0)
     block_y = block.iloc[:, -1].values
     block_x = block.iloc[:, 0:-1].values
-    os_x,os_y = SMOTEN(random_state=42).fit_resample(block_x, block_y)
-    out_x, out_y = shuffle(os_x,os_y)
+    os_x, os_y = SMOTEN(random_state=42).fit_resample(block_x, block_y)
+    out_x, out_y = shuffle(os_x, os_y)
     return out_x, out_y
 
 
