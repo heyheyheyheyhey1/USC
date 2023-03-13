@@ -12,6 +12,7 @@ random.seed(716)
 
 # Prepare test data
 out_dir = "result"
+model_dir = 'RMT_results'
 t_dir = os.path.join(out_dir, 'test_data')
 if not os.path.exists(t_dir):
     os.makedirs(t_dir)
@@ -70,47 +71,47 @@ def averaging_predictions(results):
 
 
 # Define function to evaluate model m range r on test set n
-def model_performance_test(m="GB", r=2, n=0):  # r代表训练出的第r个模型 n代表第n份测试数据
+def model_performance_test(m, r=0):  # r代表训练出的第r个模型 n代表第n份测试数据
 
     # Create test data (X_test) and labels (y_test)
-    test_set = test_set_n(n=n)  # 第n份数据 一共298份
-    gene_names = np.array(test_set.index.to_list())
-    X_test = test_set.iloc[:, 0:-1].values  # 样本
-    y_test = test_set.iloc[:, -1].values  # 样本label
 
-    n_predictions = {}
 
-    cv_scorings = pd.DataFrame(columns=['Model_n', 'Accuracy', 'Precision', 'Recall', 'F1', 'AUC'])
+    # Evaluate range r of models m
 
-    # Evaluate range r of models m 
-    for i in range(r):
-        # load model
-        read_dir = os.path.join('tuning')
-        model = pickle.load(open(os.path.join(read_dir, f'round_{i}.sav'), 'rb'))  # 读取GB模型第i次训练
+    for i in m:
+        cv_scorings = pd.DataFrame(columns=['Model_n', 'Accuracy', 'Precision', 'Recall', 'F1', 'AUC'])
+        read_dir = os.path.join(model_dir, f'draw_{r}')
+        model = pickle.load(open(os.path.join(read_dir, f'{i}_m{r}.sav'), 'rb'))  # 读取GB模型第i次训练
+        for j in range(299):
+            test_set = test_set_n(n=j)  # 第n份数据 一共298份
+            gene_names = np.array(test_set.index.to_list())
+            X_test = test_set.iloc[:, 0:-1].values  # 样本
+            y_test = test_set.iloc[:, -1].values  # 样本label
+            # load model
 
-        y_pred = model.predict(X_test)
-        accuracy = accuracy_score(y_test, y_pred)
-        precision = precision_score(y_test, y_pred)
-        recall = recall_score(y_test, y_pred)
-        f1 = f1_score(y_test, y_pred)
-        pred = model.predict_proba(X_test)
-        roc_auc = roc_auc_score(y_test, pred[:, 1])
-        classifier_performance = {'Model_n': f'{m}_{i}',
-                                  'Accuracy': f'{accuracy:.5f}',
-                                  'Precision': f'{precision:.5f}',
-                                  'Recall': f'{recall:.5f}',
-                                  'F1': f'{f1:.5f}',
-                                  'AUC': f'{roc_auc}'}
+            y_pred = model.predict(X_test)
+            accuracy = accuracy_score(y_test, y_pred)
+            precision = precision_score(y_test, y_pred)
+            recall = recall_score(y_test, y_pred)
+            f1 = f1_score(y_test, y_pred)
+            pred = model.predict_proba(X_test)
+            roc_auc = roc_auc_score(y_test, pred[:, 1])
+            classifier_performance = {'Model_n': f'{i}_{r}',
+                                      'Accuracy': f'{accuracy:.5f}',
+                                      'Precision': f'{precision:.5f}',
+                                      'Recall': f'{recall:.5f}',
+                                      'F1': f'{f1:.5f}',
+                                      'AUC': f'{roc_auc:.5f}'}
+            cv_scorings.loc[len(cv_scorings)] = classifier_performance
+        classifier_performance = {'Model_n': 'MEAN',
+                                  'Accuracy': f'{pd.to_numeric(cv_scorings["Accuracy"]).mean():.5f}',
+                                  'Precision': f'{pd.to_numeric(cv_scorings["Precision"]).mean():.5f}',
+                                  'Recall': f'{pd.to_numeric(cv_scorings["Recall"]).mean():.5f}',
+                                  'F1': f'{pd.to_numeric(cv_scorings["F1"]).mean():.5f}',
+                                  'AUC': f'{pd.to_numeric(cv_scorings["AUC"]).mean():.5f}'}
         cv_scorings.loc[len(cv_scorings)] = classifier_performance
-    classifier_performance = {'Model_n': 'MEAN',
-                              'Accuracy': f'{pd.to_numeric(cv_scorings["Accuracy"]).mean():.5f}',
-                              'Precision': f'{pd.to_numeric(cv_scorings["Precision"]).mean():.5f}',
-                              'Recall': f'{pd.to_numeric(cv_scorings["Recall"]).mean():.5f}',
-                              'F1': f'{pd.to_numeric(cv_scorings["F1"]).mean():.5f}',
-                              'AUC': f'{pd.to_numeric(cv_scorings["AUC"]).mean():.5f}'}
-    cv_scorings.loc[len(cv_scorings)] = classifier_performance
-    cv_scorings.to_csv(os.path.join(out_dir, f'{m}_test_performance.txt'), index=False, sep='\t')
+        cv_scorings.to_csv(os.path.join(out_dir, f'{i}_test_performance_{r}.txt'), index=False, sep='\t')
 
 
-for t in tqdm(range(299)):
-    model_performance_test(m="SVM", r=174, n=t)
+for t in tqdm(range(174)):
+    model_performance_test(m=['GB', 'SVM', 'GNB', 'RF', 'LR'], r=t)
