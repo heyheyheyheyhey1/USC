@@ -1,8 +1,9 @@
 import torch
+from torch import nn
 from torch.nn import Sequential, Linear, Softmax, ReLU, Sigmoid
 
 
-class WeightNet(torch.nn.Module):
+class WeightNet(nn.Module):
 
     def __init__(self, inDim=0) -> None:
         super().__init__()
@@ -18,7 +19,7 @@ class WeightNet(torch.nn.Module):
         return x4 + x
 
 
-class GEV(torch.nn.Module):
+class GEV(nn.Module):
     def __init__(self, dimIn=0) -> None:
         super().__init__()
         self.encoder = Sequential(
@@ -37,7 +38,7 @@ class GEV(torch.nn.Module):
         self.weightnet = WeightNet(dimIn)
 
     def dist(self, x, x_dot):
-        Euclid_dist = torch.nn.PairwiseDistance(p=2)
+        Euclid_dist = nn.PairwiseDistance(p=2)
         euclid_dist = Euclid_dist(x, x_dot)
         return euclid_dist
 
@@ -54,7 +55,9 @@ class GEV(torch.nn.Module):
         h2 = Linear(32,2)(h1)
         return self.gev(h2)
 
-x = torch.randn((100, 200), dtype=torch.float32)
-gev = GEV(dimIn=200)
-t = gev(x)
-print(t.shape)
+    def initialize_weights(self):
+        for m in self.modules():
+            if isinstance(m, nn.Linear):
+                torch.nn.init.normal_(m.weight.data, 0, 0.01)
+                m.bias.data.zero_()
+
