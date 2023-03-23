@@ -5,7 +5,7 @@ from random import sample
 from sklearn.utils import shuffle
 from GEV_NN_torch import GEV
 import torch
-from torch import  nn
+from torch import nn
 import tqdm
 import numpy as np
 
@@ -44,37 +44,45 @@ def data_block_n(i, batch_size):
 
 
 def get_data_n(batch_size):
+    device = get_device()
     for i in range(int(len(train_negative_genes) / batch_size)):
         x, y = data_block_n(i, batch_size)
         y = np.eye(2)[y]
-        yield torch.tensor(x,dtype=torch.float32), torch.tensor(y,dtype=torch.float32)
+        yield i,torch.tensor(x, dtype=torch.float32).to(device), torch.tensor(y, dtype=torch.float32).to(device)
 
-def loss():
+
+def get_loss_func():
     return nn.CrossEntropyLoss()
 
-def optimizer(model):
-    return torch.optim.SGD(model.parameters(),1e-3)
 
-def train_one_epoch( n_size,model,loss,optimizer):
-    for x, y in get_data_n(n_size):
+def get_optimizer_func(model):
+    return torch.optim.SGD(model.parameters(), 1e-2)
+
+
+def train_one_epoch(n_size, model, loss, optimizer,k):
+    for i,x, y in get_data_n(n_size):
         optimizer.zero_grad()
         y_hat = model(x)
-        l = loss(y,y_hat)
+        l = loss(y, y_hat)
         l.backward()
         optimizer.step()
 
-    return
-
+def get_device():
+    return torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
 def main():
     os_rate = 0.6
     epoch_num = 300
     ir = float(len(train_negative_genes) / len(train_positive_genes))
     n_size = int(len(train_negative_genes) / int(ir * os_rate))
-    feature_size = train_negative_frame.values.shape[1]-1
-    model = GEV(dimIn=feature_size)
+    feature_size = train_negative_frame.values.shape[1] - 1
+    device = get_device()
+    model = GEV(dimIn=feature_size).to(device)
+    loss = get_loss_func().to(device)
+    optimizer = get_optimizer_func(model)
+    k=10
     for i in tqdm.tqdm(range(epoch_num)):
-        train_one_epoch(n_size,model,loss(),optimizer(model))
+        train_one_epoch(n_size, model, loss, optimizer,k)
 
 
 if __name__ == "__main__":

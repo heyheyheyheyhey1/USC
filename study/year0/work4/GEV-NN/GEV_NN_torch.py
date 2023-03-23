@@ -36,7 +36,10 @@ class GEV(nn.Module):
             Sigmoid()
         )
         self.weightnet = WeightNet(dimIn)
+        self.softmax = nn.Softmax(dim=1)
 
+    def linear(self,dimIn,dimOut):
+        return Linear(dimIn,dimOut,device="cuda:0" if torch.cuda.is_available() else "cpu")
     def dist(self, x, x_dot):
         Euclid_dist = nn.PairwiseDistance(p=2)
         euclid_dist = Euclid_dist(x, x_dot)
@@ -51,8 +54,8 @@ class GEV(nn.Module):
         x_dot = self.decoder(z)
         d = self.dist(x, x_dot)
         concat = torch.cat([weighted_v, z, d.reshape(d.shape[0], -1)], 1)
-        h1 = Linear(concat.shape[1], 32)(concat)
-        h2 = Linear(32,2)(h1)
+        h1 = self.linear(concat.shape[1], 32)(concat)
+        h2 = self.linear(32,2)(h1)
         return self.gev(h2)
 
     def initialize_weights(self):
