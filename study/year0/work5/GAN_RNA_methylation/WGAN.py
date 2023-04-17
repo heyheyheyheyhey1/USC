@@ -4,27 +4,50 @@ from torch import nn
 import pickle
 import numpy as np
 import pandas as pd
-parser = argparse.ArgumentParser()
-parser.add_argument('--n_epochs', type=int, default=1800, help='number of epochs of training')
-parser.add_argument('--batch_size', type=int, default=16, help='size of the batches')
-parser.add_argument('--lr', type=float, default=0.00005, help='learning rate')
-parser.add_argument('--n_cpu', type=int, default=8, help='number of cpu threads to use during batch generation')
-parser.add_argument('--latent_dim', type=int, default=100, help='dimensionality of the latent space')
-parser.add_argument('--feature_size', type=int, default=934, help='size of each image dimension')
-parser.add_argument('--channels', type=int, default=1, help='number of image channels')
-parser.add_argument('--n_critic', type=int, default=5, help='number of training steps for discriminator per iter')
-parser.add_argument('--clip_value', type=float, default=0.01, help='lower and upper clip value for disc. weights')
-parser.add_argument('--sample_interval', type=int, default=400, help='interval betwen image samples')
-opt = parser.parse_args()
+
+
 
 class Discriminator(nn.Module):
-    def __init__(self):
-        pass
-    def forward(self,p):
-        pass
+    def __init__(self, p):
+        super().__init__()
+        self.model = nn.Sequential(
+            nn.Linear(p.in_dim, 8192),
+            nn.Linear(8192, 10240),
+            nn.Linear(10240, 8192),
+            nn.Linear(8192, p.in_dim),
+            nn.Linear(p.in_dim, 2048),
+            nn.Linear(2048,1024),
+            nn.Linear(1024,512),
+            nn.Linear(512,256),
+            nn.Linear(256,1),
+        )
+
+    def forward(self, x):
+        out = self.model(x)
+        return out
+
 
 class Generator(nn.Module):
-    def __init__(self):
+    def __init__(self,p):
+        super().__init__()
+        self.model = nn.Sequential(
+            nn.Linear(p.in_dim,8192),
+            nn.Linear(8192,8192),
+            nn.Linear(8192,8192),
+            nn.Linear(8192,8192),
+            nn.Linear(8192,8192),
+            nn.Linear(8192,p.out_dim)
+        )
+
+    def forward(self, x):
+        out = self.model(x)
+        return out
+
+class WGAN():
+    def __init__(self,args):
+        self.train_data = args.train_data,
+        self.arg_g = args.arg_g
+        self.arg_d = args.arg_d
         pass
-    def forward(self,p):
+    def train(self):
         pass
