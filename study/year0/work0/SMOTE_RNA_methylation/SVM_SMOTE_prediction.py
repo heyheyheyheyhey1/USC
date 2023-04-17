@@ -13,12 +13,16 @@ from sklearn.metrics import *
 
 CV_DIR = os.path.join("CV", "SVM")
 MODEL_DIR = os.path.join("model","SVM")
-
+TUNING_DIR = os.path.join("CV","SVM","tuning")
 if not os.path.exists(MODEL_DIR):
     os.makedirs(MODEL_DIR)
 
 if not os.path.exists(CV_DIR):
     os.makedirs(CV_DIR)
+
+if not os.path.exists(TUNING_DIR):
+    os.makedirs(TUNING_DIR)
+
 
 harmonizome_data = "harmonizome_data_combined.tsv"
 selected_data = "selected_dataset.tsv"
@@ -58,7 +62,7 @@ def SVM_tuning(n, X_train, y_train):
     scores = ['accuracy']  # select scores e.g scores = ['recall', 'accuracy']
     grid_param_svm = [{'kernel': ['rbf'], 'gamma': [1e-1, 1e-2, 1e-3, 1e-4], 'C': range(1, 1000),"class_weight":["balanced"]},
                       {'kernel': ['linear'], 'C': range(1, 1000),"class_weight":["balanced"]},]
-    svm_tuning_info = open(os.path.join("tuning", f'SVM_tuning_{n}.txt'), "w")
+    svm_tuning_info = open(os.path.join(TUNING_DIR, f'SVM_tuning_{n}.txt'), "w")
     for score in scores:
         svm_tuning = GridSearchCV(SVC(random_state=3), grid_param_svm, cv=KFold(3, shuffle=True, random_state=3),
                                   scoring='%s' % score, n_jobs=12)

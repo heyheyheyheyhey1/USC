@@ -109,8 +109,8 @@ def negative_sample_draw(gene_list, n=0):
 ### Functions for hyper-parameter tuning
 def SVM_tuning(n, n_dir, X_train, y_train):
     scores = ['accuracy']  # select scores e.g scores = ['recall', 'accuracy']
-    grid_param_svm = [{'kernel': ['rbf'], 'gamma': [1e-2, 1e-3, 1e-4], 'C': [1, 10, 100, 1000]},
-                      {'kernel': ['linear'], 'C': [1, 10, 100, 1000]}]
+    grid_param_svm = [{'kernel': ['rbf'], 'gamma': [1e-1, 1e-2, 1e-3, 1e-4], 'C': range(1, 1000)},
+                      {'kernel': ['linear'], 'C': range(1, 1000)},]
 
     svm_tuning_info = open(os.path.join(n_dir, f'SVM_tuning_n{n}.txt'), "w")
     for score in scores:
