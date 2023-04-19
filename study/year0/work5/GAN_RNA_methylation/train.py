@@ -12,12 +12,12 @@ DATA_DIR = os.path.join("data")
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--n_epochs', type=int, default=1800, help='number of epochs of training')
-    parser.add_argument('--batch_size', type=int, default=10, help='size of the batches')
-    parser.add_argument('--lr', type=float, default=0.001, help='learning rate')
+    parser.add_argument('--n_epochs', type=int, default=4000, help='number of epochs of training')
+    parser.add_argument('--batch_size', type=int, default=12, help='size of the batches')
+    parser.add_argument('--lr', type=float, default=0.0005, help='learning rate')
     parser.add_argument('--feature_size', type=int, default=934, help='size of each image dimension')
     parser.add_argument('--n_critic', type=int, default=5, help='number of training steps for discriminator per iter')
-    parser.add_argument('--clip_value', type=float, default=0.01, help='lower and upper clip value for disc. weights')
+    parser.add_argument('--clip_value', type=float, default=0.003, help='lower and upper clip value for disc. weights')
     parser.add_argument('--sample_interval', type=int, default=400, help='interval betwen image samples')
     opt = parser.parse_args()
     selected_data = "selected_dataset.tsv"
