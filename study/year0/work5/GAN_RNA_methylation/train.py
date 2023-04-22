@@ -8,17 +8,23 @@ from WGAN import WGAN
 import os
 
 DATA_DIR = os.path.join("data")
+MODEL_DIR = os.path.join("model")
+MODEL_DIR_G = os.path.join(MODEL_DIR, "generator")
+MODEL_DIR_D = os.path.join(MODEL_DIR, "discriminator")
+if not os.path.exists(MODEL_DIR_G):
+    os.makedirs(MODEL_DIR_G)
+if not os.path.exists(MODEL_DIR_D):
+    os.makedirs(MODEL_DIR_D)
 
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--n_epochs', type=int, default=4000, help='number of epochs of training')
-    parser.add_argument('--batch_size', type=int, default=12, help='size of the batches')
-    parser.add_argument('--lr', type=float, default=0.0005, help='learning rate')
-    parser.add_argument('--feature_size', type=int, default=934, help='size of each image dimension')
-    parser.add_argument('--n_critic', type=int, default=5, help='number of training steps for discriminator per iter')
-    parser.add_argument('--clip_value', type=float, default=0.003, help='lower and upper clip value for disc. weights')
-    parser.add_argument('--sample_interval', type=int, default=400, help='interval betwen image samples')
+    parser.add_argument('--n_epochs', type=int, default=20000, help='number of epochs of training')
+    parser.add_argument('--batch_size', type=int, default=8, help='size of the batches')
+    parser.add_argument('--lr', type=float, default=0.00005, help='learning rate')
+    parser.add_argument('--n_critic', type=int, default=6, help='number of training steps for discriminator per iter')
+    parser.add_argument('--clip_value', type=float, default=0.02, help='lower and upper clip value for disc. weights')
+    parser.add_argument('--latent_dim', type=int, default=128, help='dimensionality of the latent space')
     opt = parser.parse_args()
     selected_data = "selected_dataset.tsv"
     rnmts = "RNMT.list"
@@ -29,6 +35,8 @@ def main():
     args = {}
     args["train_data"] = positive_data
     args["train_opt"] = opt
+    args["g_sav_dir"] = MODEL_DIR_G
+    args["d_sav_dir"] = MODEL_DIR_D
     wgan = WGAN(args)
     wgan.train()
 
