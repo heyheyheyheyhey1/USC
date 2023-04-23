@@ -22,8 +22,8 @@ def main():
     parser.add_argument('--n_epochs', type=int, default=20000, help='number of epochs of training')
     parser.add_argument('--batch_size', type=int, default=8, help='size of the batches')
     parser.add_argument('--lr', type=float, default=0.00005, help='learning rate')
-    parser.add_argument('--n_critic', type=int, default=6, help='number of training steps for discriminator per iter')
-    parser.add_argument('--clip_value', type=float, default=0.02, help='lower and upper clip value for disc. weights')
+    parser.add_argument('--n_critic', type=int, default=3, help='number of training steps for discriminator per iter')
+    parser.add_argument('--clip_value', type=float, default=0.01, help='lower and upper clip value for disc. weights')
     parser.add_argument('--latent_dim', type=int, default=128, help='dimensionality of the latent space')
     opt = parser.parse_args()
     selected_data = "selected_dataset.tsv"
