@@ -1,14 +1,14 @@
 import os
 
 import torch
-import argparse
 from torch import nn
-import pickle
 import numpy as np
-import pandas as pd
 import tqdm
-import time
 import matplotlib.pyplot as plt
+from sklearn.svm import SVC
+from sklearn.model_selection import cross_val_score, cross_validate, LeaveOneOut
+from sklearn.metrics import make_scorer, accuracy_score, precision_score
+from sklearn.utils import shuffle
 
 
 class Discriminator(nn.Module):
@@ -79,9 +79,9 @@ class WGANGP():
         self.generator = Generator(**arg_g).to(self.device).apply(initialize_weights)
         self.discriminator = Discriminator(**arg_d).to(self.device).apply(initialize_weights)
         self.optimizer_G = torch.optim.Adam(self.generator.parameters(), lr=self.train_opt.lr_g,
-                                           )
+                                            )
         self.optimizer_D = torch.optim.Adam(self.discriminator.parameters(), lr=self.train_opt.lr_d,
-                                           )
+                                            )
         self.losses_G = []
         self.losses_D = []
 
@@ -124,9 +124,27 @@ class WGANGP():
     def noise(self, num):
         return torch.rand([num, self.train_opt.latent_dim]).to(self.device)
 
+    def C2ST(self):
+        self.discriminator.eval()
+        self.generator.eval()
+        len = self.train_data.shape[0]
+        fake_data = self.generator(self.noise(len)).detach().cpu()
+        c2st_x = np.concatenate([fake_data, self.train_data])
+        c2st_y = np.concatenate([np.zeros([len, ]), np.ones([len, ])])
+        c2st_x, c2st_y = shuffle(c2st_x, c2st_y)
+        SVM_model = SVC()
+        loocv = LeaveOneOut()
+        scorings = {'accuracy': make_scorer(accuracy_score),
+                    'precision': make_scorer(precision_score),
+                    }
+        cv_result = cross_validate(SVM_model, c2st_x, c2st_y, scoring=scorings, cv=5)
+        return cv_result["test_accuracy"].mean(), cv_result["test_precision"].mean()
+
     def train_one_epoch(self, n_epoch):
         epoch_losses_G = []
         epoch_losses_D = []
+        self.discriminator.train()
+        self.generator.train()
         for i, real_data in self.train_data_enumerator():
             # discriminator training
             for j in range(self.train_opt.n_critic):
@@ -142,8 +160,6 @@ class WGANGP():
                     self.discriminator(fake_data)) + self.train_opt.r * gp
                 loss_D.backward()
                 self.optimizer_D.step()
-                # for params in self.discriminator.parameters():
-                #     params.data.clamp_(-self.train_opt.clip_value, self.train_opt.clip_value) 
                 epoch_losses_D.append(loss_D)
             # generator training
             self.optimizer_G.zero_grad()
@@ -154,9 +170,13 @@ class WGANGP():
             self.optimizer_G.step()
             epoch_losses_G.append(loss_G)
         if (n_epoch % 5 == 0):
-            print("\n[Epoch %d/%d] [D loss: %f] [G loss: %f]" % (n_epoch, self.train_opt.n_epochs,
-                                                                 torch.mean(torch.FloatTensor(epoch_losses_D)),
-                                                                 torch.mean(torch.FloatTensor(epoch_losses_G))))
+            acc, pric = self.C2ST()
+            print("\n[Epoch %d/%d] [D loss: %f] [G loss: %f] [C2ST: %f]" % (n_epoch, self.train_opt.n_epochs,
+                                                                            torch.mean(
+                                                                                torch.FloatTensor(epoch_losses_D)),
+                                                                            torch.mean(
+                                                                                torch.FloatTensor(epoch_losses_G)),
+                                                                            acc))
         if (n_epoch % 200 == 0):
             torch.save(self.generator.state_dict(),
                        os.path.join(self.g_save_dir,
