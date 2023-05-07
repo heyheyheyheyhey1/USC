@@ -136,12 +136,13 @@ def train_one_epoch(X, Y, n):
 
     return model
 
-def oversample(x,y):
-    synthetic_num = abs(np.sum(y==0) - np.sum(y==1))
-    synthetic_data = generator(torch.rand(synthetic_num,128))
+
+def oversample(x, y):
+    synthetic_num = abs(np.sum(y == 0) - np.sum(y == 1))
+    synthetic_data = generator(torch.rand(synthetic_num, 128))
     x_os = np.concatenate([synthetic_data.detach(), x]).copy()
-    y_os = np.concatenate([np.ones([synthetic_num,]),y]).copy()
-    return x_os,y_os
+    y_os = np.concatenate([np.ones([synthetic_num, ]), y]).copy()
+    return x_os, y_os
 
 
 def data_block_n(i, batch_size):

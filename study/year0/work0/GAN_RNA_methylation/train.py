@@ -21,14 +21,17 @@ if not os.path.exists(MODEL_DIR_D):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--n_epochs', type=int, default=20000, help='number of epochs of training')
-    parser.add_argument('--batch_size', type=int, default=8, help='size of the batches')
+    parser.add_argument('--batch_size', type=int, default=12, help='size of the batches')
     parser.add_argument('--lr', type=float, default=0.00005, help='learning rate')
-    parser.add_argument('--n_critic', type=int, default=5, help='number of training steps for discriminator per iter')
+    parser.add_argument('--lr_g', type=float, default=0.00005, help='learning rate g')
+    parser.add_argument('--lr_d', type=float, default=0.00005, help='learning rate d')
+    parser.add_argument('--n_critic', type=int, default=7, help='number of training steps for discriminator per iter')
     parser.add_argument('--clip_value', type=float, default=0.01, help='lower and upper clip value for disc. weights')
     parser.add_argument('--latent_dim', type=int, default=128, help='dimensionality of the latent space')
     parser.add_argument('--beta1', type=int, default=0, help='wgangp optimizer parameter')
     parser.add_argument('--beta2', type=int, default=0.9, help='wgangp optimizer parameter')
-    parser.add_argument('--r', type=int, default=10, help='define gradient penalty factor')
+    parser.add_argument('--r', type=int, default=5, help='define gradient penalty factor')
+    parser.add_argument('--type', type=str, default="gp", help='GAN type')
     opt = parser.parse_args()
     selected_data = "selected_dataset.tsv"
     rnmts = "RNMT.list"

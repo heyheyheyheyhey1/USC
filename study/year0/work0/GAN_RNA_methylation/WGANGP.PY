@@ -17,6 +17,10 @@ class Discriminator(nn.Module):
         self.model = nn.Sequential(
             nn.Linear(in_dim, 1024),
             nn.LeakyReLU(0.2, inplace=True),
+            nn.Linear(1024, 1024),
+            nn.LeakyReLU(0.2, inplace=True),
+            nn.Linear(1024, 1024),
+            nn.LeakyReLU(0.2, inplace=True),
             nn.Linear(1024, 512),
             nn.LeakyReLU(0.2, inplace=True),
             nn.Linear(512, 256),
@@ -27,7 +31,9 @@ class Discriminator(nn.Module):
             nn.LeakyReLU(0.2, inplace=True),
             nn.Linear(64, 32),
             nn.LeakyReLU(0.2, inplace=True),
-            nn.Linear(32, 1)
+            nn.Linear(32, 16),
+            nn.LeakyReLU(0.2, inplace=True),
+            nn.Linear(16, 1)
         )
 
     def forward(self, x):
@@ -43,9 +49,10 @@ class Generator(nn.Module):
             nn.Linear(256, 512),
             nn.Linear(512, 1024),
             nn.Linear(1024, 2048),
+            nn.Linear(2048, 2048),
+            nn.Linear(2048, 2048),
             nn.Linear(2048, 1024),
             nn.Linear(1024, out_dim),
-
             nn.Tanh()
         )
 
@@ -71,15 +78,15 @@ class WGANGP():
         arg_d = {"in_dim": self.train_data.shape[1]}
         self.generator = Generator(**arg_g).to(self.device).apply(initialize_weights)
         self.discriminator = Discriminator(**arg_d).to(self.device).apply(initialize_weights)
-        self.optimizer_G = torch.optim.Adam(self.generator.parameters(), lr=self.train_opt.lr,
-                                            betas=(self.train_opt.beta1, self.train_opt.beta2))
-        self.optimizer_D = torch.optim.Adam(self.discriminator.parameters(), lr=self.train_opt.lr,
-                                            betas=(self.train_opt.beta1, self.train_opt.beta2))
+        self.optimizer_G = torch.optim.Adam(self.generator.parameters(), lr=self.train_opt.lr_g,
+                                           )
+        self.optimizer_D = torch.optim.Adam(self.discriminator.parameters(), lr=self.train_opt.lr_d,
+                                           )
         self.losses_G = []
         self.losses_D = []
 
     def cal_gradient_penalty(self, real_data, fake_data):
-        alpha = torch.Tensor(np.random.random((real_data.size(0), 1, 1, 1))).to(self.device)
+        alpha = torch.Tensor(np.random.random(real_data.shape)).to(self.device)
         interpolates = (alpha * real_data + ((1 - alpha) * fake_data)).requires_grad_(True)
         d_interpolates = self.discriminator(interpolates)
         gradients = torch.autograd.grad(
@@ -90,10 +97,8 @@ class WGANGP():
             retain_graph=True,
             only_inputs=True,
         )[0]
-        gradients = gradients.view(gradients.size(0), -1)
         gradient_penalty = ((gradients.norm(2, dim=1) - 1) ** 2).mean()
         return gradient_penalty
-        pass
 
     def train_data_enumerator(self):
         for i in range(int(len(self.train_data) / self.train_opt.batch_size)):
@@ -138,7 +143,7 @@ class WGANGP():
                 loss_D.backward()
                 self.optimizer_D.step()
                 # for params in self.discriminator.parameters():
-                #     params.data.clamp_(-self.train_opt.clip_value, self.train_opt.clip_value)
+                #     params.data.clamp_(-self.train_opt.clip_value, self.train_opt.clip_value) 
                 epoch_losses_D.append(loss_D)
             # generator training
             self.optimizer_G.zero_grad()
