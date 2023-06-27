@@ -17,3 +17,7 @@
 - https://arxiv.org/abs/2205.00904
 把这篇文章的PU learning loss改为最常规的binary classification PU learnign的loss，再结合GAN构建新的loss，从而构建最终的loss
 - 还有原始数据，对于那些本来是关系型数据的，我们不将其转为特征向量，而是直接用关系型数据，然后用GNN相关内容（后面这样子去做）
+
+# 2023-06-27
+- Positive-Unlabeled Learning with Adversarial Data Augmentation for Knowledge Graph Completion
+- 修改discriminator ，变成几层NN
