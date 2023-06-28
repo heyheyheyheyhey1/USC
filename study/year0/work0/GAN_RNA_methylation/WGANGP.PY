@@ -17,10 +17,6 @@ class Discriminator(nn.Module):
         self.model = nn.Sequential(
             nn.Linear(in_dim, 1024),
             nn.LeakyReLU(0.2, inplace=True),
-            nn.Linear(1024, 1024),
-            nn.LeakyReLU(0.2, inplace=True),
-            nn.Linear(1024, 1024),
-            nn.LeakyReLU(0.2, inplace=True),
             nn.Linear(1024, 512),
             nn.LeakyReLU(0.2, inplace=True),
             nn.Linear(512, 256),
@@ -48,10 +44,6 @@ class Generator(nn.Module):
             nn.Linear(in_dim, 256),
             nn.Linear(256, 512),
             nn.Linear(512, 1024),
-            nn.Linear(1024, 2048),
-            nn.Linear(2048, 2048),
-            nn.Linear(2048, 2048),
-            nn.Linear(2048, 1024),
             nn.Linear(1024, out_dim),
             nn.Tanh()
         )
@@ -79,9 +71,9 @@ class WGANGP():
         self.generator = Generator(**arg_g).to(self.device).apply(initialize_weights)
         self.discriminator = Discriminator(**arg_d).to(self.device).apply(initialize_weights)
         self.optimizer_G = torch.optim.Adam(self.generator.parameters(), lr=self.train_opt.lr_g,
-                                            )
+                                            betas=(self.train_opt.beta1, self.train_opt.beta2))
         self.optimizer_D = torch.optim.Adam(self.discriminator.parameters(), lr=self.train_opt.lr_d,
-                                            )
+                                            betas=(self.train_opt.beta1, self.train_opt.beta2))
         self.losses_G = []
         self.losses_D = []
 
@@ -143,6 +135,7 @@ class WGANGP():
     def train_one_epoch(self, n_epoch):
         epoch_losses_G = []
         epoch_losses_D = []
+        epoch_gps = []
         self.discriminator.train()
         self.generator.train()
         for i, real_data in self.train_data_enumerator():
@@ -161,6 +154,7 @@ class WGANGP():
                 loss_D.backward()
                 self.optimizer_D.step()
                 epoch_losses_D.append(loss_D)
+                epoch_gps.append(gp)
             # generator training
             self.optimizer_G.zero_grad()
             noise = self.noise(self.train_opt.batch_size)
@@ -169,20 +163,36 @@ class WGANGP():
             loss_G.backward()
             self.optimizer_G.step()
             epoch_losses_G.append(loss_G)
-        if (n_epoch % 5 == 0):
-            acc, pric = self.C2ST()
-            print("\n[Epoch %d/%d] [D loss: %f] [G loss: %f] [C2ST: %f]" % (n_epoch, self.train_opt.n_epochs,
-                                                                            torch.mean(
-                                                                                torch.FloatTensor(epoch_losses_D)),
-                                                                            torch.mean(
-                                                                                torch.FloatTensor(epoch_losses_G)),
-                                                                            acc))
-        if (n_epoch % 200 == 0):
+        acc, pric = self.C2ST()
+        if (acc <= 0.65):
             torch.save(self.generator.state_dict(),
                        os.path.join(self.g_save_dir,
                                     f'generator_n_{n_epoch}.pth'))
             torch.save(self.discriminator.state_dict(),
                        os.path.join(self.d_save_dir,
                                     f'discriminator_n_{n_epoch}.pth'))
+            print("\n[Epoch %d/%d] [D loss: %f] [G loss: %f] [GP: %f] [C2ST: %f] " % (n_epoch, self.train_opt.n_epochs,
+                                                                                      torch.mean(
+                                                                                          torch.FloatTensor(
+                                                                                              epoch_losses_D)),
+                                                                                      torch.mean(
+                                                                                          torch.FloatTensor(
+                                                                                              epoch_losses_G)),
+                                                                                      torch.mean(torch.FloatTensor(
+                                                                                          epoch_gps)),
+                                                                                      acc,
+                                                                                      ))
+        if (n_epoch % 5 == 0):
+            print("\n[Epoch %d/%d] [D loss: %f] [G loss: %f] [GP: %f] [C2ST: %f] " % (n_epoch, self.train_opt.n_epochs,
+                                                                                      torch.mean(
+                                                                                          torch.FloatTensor(
+                                                                                              epoch_losses_D)),
+                                                                                      torch.mean(
+                                                                                          torch.FloatTensor(
+                                                                                              epoch_losses_G)),
+                                                                                      torch.mean(torch.FloatTensor(
+                                                                                          epoch_gps)),
+                                                                                      acc,
+                                                                                      ))
         self.losses_D.append(torch.mean(torch.FloatTensor(epoch_losses_D)).cpu().numpy())
         self.losses_G.append(torch.mean(torch.FloatTensor(epoch_losses_G)).cpu().numpy())

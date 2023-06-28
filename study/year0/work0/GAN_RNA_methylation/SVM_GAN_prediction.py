@@ -1,7 +1,7 @@
 import random
 import torch
 from torch import nn
-from WGAN import Generator
+from WGANGP import Generator
 import pandas as pd
 import pickle
 import os
@@ -18,7 +18,7 @@ MODEL_DIR = os.path.join("model")
 TUNING_DIR = os.path.join("CV", "SVM", "tuning")
 DATA_DIR = os.path.join("data")
 generator = Generator(in_dim=128, out_dim=1517)
-generator.load_state_dict(torch.load(os.path.join(MODEL_DIR, "generator", "generator_n_20000.pth")))
+generator.load_state_dict(torch.load(os.path.join(MODEL_DIR,"wgangp", "generator", "generator_n_222.pth")))
 generator.eval()
 
 if not os.path.exists(MODEL_DIR):
@@ -156,7 +156,7 @@ def data_block_n(i, batch_size):
 
 
 def main():
-    os_rate = 0.6
+    os_rate = 0.5
     ir = float(len(train_negative_genes) / len(train_positive_genes))
     epoch_num = int(ir * os_rate)
     batch_size = int(len(train_negative_genes) / epoch_num)
