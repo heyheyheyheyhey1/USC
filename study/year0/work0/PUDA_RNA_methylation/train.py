@@ -1,11 +1,6 @@
-import torch
 import argparse
-from torch import nn
-import pickle
-import numpy as np
 import pandas as pd
-# from WGAN import WGAN
-from PUDA_RNA_methylation import WGANGP
+from PUDA_RNA_methylation import PUGAN
 import os
 
 DATA_DIR = os.path.join("data")
@@ -20,17 +15,16 @@ if not os.path.exists(MODEL_DIR_D):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--n_epochs', type=int, default=20000, help='number of epochs of training')
-    parser.add_argument('--batch_size', type=int, default=92, help='size of the batches')
+    parser.add_argument('--n_epochs', type=int, default=1000, help='number of epochs of training')
+    parser.add_argument('--batch_size', type=int, default=46, help='size of the batches')
+    parser.add_argument('--neg_num', type=int, default=8, help='num of negative generated')
     parser.add_argument('--lr', type=float, default=0.00005, help='learning rate')
     parser.add_argument('--lr_g', type=float, default=0.00001, help='learning rate g')
     parser.add_argument('--lr_d', type=float, default=0.00001, help='learning rate d')
     parser.add_argument('--n_critic', type=int, default=7, help='number of training steps for discriminator per iter')
-    parser.add_argument('--clip_value', type=float, default=0.01, help='lower and upper clip value for disc. weights')
     parser.add_argument('--latent_dim', type=int, default=128, help='dimensionality of the latent space')
-    parser.add_argument('--beta1', type=int, default=0.9, help='wgangp optimizer parameter')
-    parser.add_argument('--beta2', type=int, default=0.95, help='wgangp optimizer parameter')
-    parser.add_argument('--r', type=int, default=5, help='define gradient penalty factor')
+    parser.add_argument('--beta1', type=int, default=0.9, help=' optimizer parameter')
+    parser.add_argument('--beta2', type=int, default=0.95, help=' optimizer parameter')
     parser.add_argument('--prior', type=str, default=0.0001, help='prior')
     opt = parser.parse_args()
     selected_data = "selected_dataset.tsv"
@@ -38,14 +32,17 @@ def main():
     dataset_matrix = os.path.join(DATA_DIR, selected_data)
     selected_data = pd.read_csv(dataset_matrix, delimiter="\t", index_col=0, low_memory=False)
     positive_genes = [line.rstrip('\n') for line in open(os.path.join(DATA_DIR, rnmts))]
+    unlabel_genes = list(selected_data.index.difference(positive_genes))
     positive_data = selected_data.loc[positive_genes].values
+    unlabel_data = selected_data.loc[unlabel_genes].values
     args = {}
-    args["train_data"] = positive_data
+    args["positive_data"] = positive_data
+    args["unlabel_data"] = unlabel_data
     args["train_opt"] = opt
     args["g_sav_dir"] = MODEL_DIR_G
     args["d_sav_dir"] = MODEL_DIR_D
-    wgan = WGANGP(args)
-    wgan.train()
+    gan = PUGAN(args)
+    gan.train()
 
 
 if __name__ == "__main__":
