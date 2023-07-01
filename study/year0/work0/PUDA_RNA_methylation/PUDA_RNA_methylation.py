@@ -112,7 +112,7 @@ class PUGAN():
         plt.savefig(os.path.join("train_loss.png"))
 
     def noise(self, num):
-        return torch.rand([num, self.train_opt.latent_dim]).to(self.device)
+        return torch.randn([num, self.train_opt.latent_dim]).to(self.device)
 
     def get_unlabel(self):
         unlabel_batch = sample(list(self.unlabel_data),self.train_opt.neg_num * self.train_opt.batch_size)
@@ -160,7 +160,7 @@ class PUGAN():
             # for j in range(self.train_opt.n_critic):
             self.optimizer_D.zero_grad()
             noise = self.noise(self.train_opt.neg_num * self.train_opt.batch_size)
-            fake_data = self.generator(noise)
+            fake_data = self.generator(noise.detach())
             unlabel = self.get_unlabel()
             fake_data = torch.concat([fake_data,unlabel])
             pred_fake = self.discriminator(fake_data)
@@ -170,7 +170,7 @@ class PUGAN():
             loss_D.backward()
             self.optimizer_D.step()
             epoch_losses_D.append(loss_D)
-
+        c2st_acc ,c2st_prec= self.C2ST()
         if (n_epoch % 5 == 0):
             torch.save(self.generator.state_dict(),
                        os.path.join(self.g_save_dir,
@@ -178,14 +178,15 @@ class PUGAN():
             torch.save(self.discriminator.state_dict(),
                        os.path.join(self.d_save_dir,
                                     f'discriminator_n_{n_epoch}.pth'))
-            print("\n[Epoch %d/%d] [D loss: %f] [G loss: %f]  " % (n_epoch, self.train_opt.n_epochs,
+            print("\n[Epoch %d/%d] [D loss: %f] [G loss: %f] [C2ST ACC: %f] [C2ST PREC: %f]" % (n_epoch, self.train_opt.n_epochs,
                                                                                       torch.mean(
                                                                                           torch.FloatTensor(
                                                                                               epoch_losses_D)),
                                                                                       torch.mean(
                                                                                           torch.FloatTensor(
                                                                                               epoch_losses_G)),
-
+                                                                                        c2st_acc,
+                                                                                        c2st_prec
                                                                                       ))
         self.losses_D.append(torch.mean(torch.FloatTensor(epoch_losses_D)).cpu().numpy())
         self.losses_G.append(torch.mean(torch.FloatTensor(epoch_losses_G)).cpu().numpy())

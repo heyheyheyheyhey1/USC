@@ -2,9 +2,9 @@ import argparse
 import pandas as pd
 from PUDA_RNA_methylation import PUGAN
 import os
-
+from random import sample
 DATA_DIR = os.path.join("data")
-MODEL_DIR = os.path.join("model","wgangp")
+MODEL_DIR = os.path.join("model","PUGAN")
 MODEL_DIR_G = os.path.join(MODEL_DIR, "generator")
 MODEL_DIR_D = os.path.join(MODEL_DIR, "discriminator")
 if not os.path.exists(MODEL_DIR_G):
@@ -15,9 +15,9 @@ if not os.path.exists(MODEL_DIR_D):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--n_epochs', type=int, default=1000, help='number of epochs of training')
-    parser.add_argument('--batch_size', type=int, default=46, help='size of the batches')
-    parser.add_argument('--neg_num', type=int, default=8, help='num of negative generated')
+    parser.add_argument('--n_epochs', type=int, default=2000, help='number of epochs of training')
+    parser.add_argument('--batch_size', type=int, default=23, help='size of the batches')
+    parser.add_argument('--neg_num', type=int, default=6, help='num of negative generated')
     parser.add_argument('--lr', type=float, default=0.00005, help='learning rate')
     parser.add_argument('--lr_g', type=float, default=0.00001, help='learning rate g')
     parser.add_argument('--lr_d', type=float, default=0.00001, help='learning rate d')
@@ -33,7 +33,7 @@ def main():
     selected_data = pd.read_csv(dataset_matrix, delimiter="\t", index_col=0, low_memory=False)
     positive_genes = [line.rstrip('\n') for line in open(os.path.join(DATA_DIR, rnmts))]
     unlabel_genes = list(selected_data.index.difference(positive_genes))
-    positive_data = selected_data.loc[positive_genes].values
+    positive_data = selected_data.loc[sample(positive_genes,int(len(positive_genes)*0.8))].values
     unlabel_data = selected_data.loc[unlabel_genes].values
     args = {}
     args["positive_data"] = positive_data
