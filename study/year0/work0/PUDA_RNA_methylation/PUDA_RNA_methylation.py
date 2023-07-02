@@ -20,17 +20,7 @@ class Discriminator(nn.Module):
             nn.LeakyReLU(0.2, inplace=True),
             nn.Linear(1024, 512),
             nn.LeakyReLU(0.2, inplace=True),
-            nn.Linear(512, 256),
-            nn.LeakyReLU(0.2, inplace=True),
-            nn.Linear(256, 128),
-            nn.LeakyReLU(0.2, inplace=True),
-            nn.Linear(128, 64),
-            nn.LeakyReLU(0.2, inplace=True),
-            nn.Linear(64, 32),
-            nn.LeakyReLU(0.2, inplace=True),
-            nn.Linear(32, 16),
-            nn.LeakyReLU(0.2, inplace=True),
-            nn.Linear(16, 1)
+            nn.Linear(512, 1)
         )
 
     def forward(self, x):
@@ -42,10 +32,8 @@ class Generator(nn.Module):
     def __init__(self, in_dim, out_dim):
         super().__init__()
         self.model = nn.Sequential(
-            nn.Linear(in_dim, 256),
-            nn.Linear(256, 512),
-            nn.Linear(512, 1024),
-            nn.Linear(1024, out_dim),
+            nn.Linear(in_dim, 512),
+            nn.Linear(512, out_dim),
             nn.Tanh()
         )
 
