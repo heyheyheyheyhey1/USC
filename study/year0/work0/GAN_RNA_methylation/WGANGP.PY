@@ -19,17 +19,9 @@ class Discriminator(nn.Module):
             nn.LeakyReLU(0.2, inplace=True),
             nn.Linear(1024, 512),
             nn.LeakyReLU(0.2, inplace=True),
-            nn.Linear(512, 256),
+            nn.Linear(512, 128),
             nn.LeakyReLU(0.2, inplace=True),
-            nn.Linear(256, 128),
-            nn.LeakyReLU(0.2, inplace=True),
-            nn.Linear(128, 64),
-            nn.LeakyReLU(0.2, inplace=True),
-            nn.Linear(64, 32),
-            nn.LeakyReLU(0.2, inplace=True),
-            nn.Linear(32, 16),
-            nn.LeakyReLU(0.2, inplace=True),
-            nn.Linear(16, 1)
+            nn.Linear(128, 1)
         )
 
     def forward(self, x):
@@ -41,8 +33,7 @@ class Generator(nn.Module):
     def __init__(self, in_dim, out_dim):
         super().__init__()
         self.model = nn.Sequential(
-            nn.Linear(in_dim, 256),
-            nn.Linear(256, 512),
+            nn.Linear(in_dim, 512),
             nn.Linear(512, 1024),
             nn.Linear(1024, out_dim),
             nn.Tanh()
@@ -164,13 +155,13 @@ class WGANGP():
             self.optimizer_G.step()
             epoch_losses_G.append(loss_G)
         acc, pric = self.C2ST()
-        if (acc <= 0.65):
+        if abs(acc - 0.5) <= self.train_opt.stop_threshold:
             torch.save(self.generator.state_dict(),
                        os.path.join(self.g_save_dir,
-                                    f'generator_n_{n_epoch}.pth'))
+                                    f'generator_n_{n_epoch}_acc_{acc:.3f}.pth'))
             torch.save(self.discriminator.state_dict(),
                        os.path.join(self.d_save_dir,
-                                    f'discriminator_n_{n_epoch}.pth'))
+                                    f'discriminator_n_{n_epoch}_acc_{acc:.3f}.pth'%acc))
             print("\n[Epoch %d/%d] [D loss: %f] [G loss: %f] [GP: %f] [C2ST: %f] " % (n_epoch, self.train_opt.n_epochs,
                                                                                       torch.mean(
                                                                                           torch.FloatTensor(
