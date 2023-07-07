@@ -1,11 +1,9 @@
 import random
 import torch
-from torch import nn
 from WGANGP import Generator
 import pandas as pd
 import pickle
 import os
-from random import sample
 from sklearn.utils import shuffle
 import tqdm
 import numpy as np
@@ -18,7 +16,7 @@ MODEL_DIR = os.path.join("model")
 TUNING_DIR = os.path.join("CV", "SVM", "tuning")
 DATA_DIR = os.path.join("data")
 generator = Generator(in_dim=128, out_dim=1517)
-generator.load_state_dict(torch.load(os.path.join(MODEL_DIR,"wgangp", "generator", "generator_n_222.pth")))
+generator.load_state_dict(torch.load(os.path.join(MODEL_DIR, "wgangp", "generator", "generator_n_1355_acc_0.459.pth")))
 generator.eval()
 
 if not os.path.exists(MODEL_DIR):
@@ -40,8 +38,8 @@ positive_genes = [line.rstrip('\n') for line in open(os.path.join("data", rnmts)
 negative_genes = set(all_genes).difference(positive_genes)  # 负样本
 
 selected_data["Y"] = [1 if idx in positive_genes else 0 for idx in selected_data.index.to_list()]
-test_positive_genes = sample(positive_genes, int(0.2 * len(positive_genes)))  # 取正样本20%作为测试
-test_negative_genes = sample(negative_genes, int(0.2 * len(negative_genes)))  # 测试负样本
+test_positive_genes = [line.rstrip('\n') for line in open(os.path.join("data", "test_positive_genes.txt"))]
+test_negative_genes = [line.rstrip('\n') for line in open(os.path.join("data", "test_negative_genes.txt"))]
 train_positive_genes = set(positive_genes).difference(test_positive_genes)
 train_negative_genes = set(negative_genes).difference(test_negative_genes)
 train_positive_frame = selected_data.loc[list(train_positive_genes)]
@@ -52,23 +50,15 @@ print("test genes num: %d\n" % (len(test_negative_genes) + len(test_positive_gen
 
 random.seed(42)
 
-# print("positive num before oversample: %d" % (len(train_y)))
-# train_x_os, train_y_os = SMOTEN(random_state=42, sampling_strategy={1: 2000}).fit_resample(train_x, train_y)
-# print("length after oversample: %d" % (len(train_x_os)))
-
-# shuffle_idx = shuffle(range(len(train_x_os)))
-# train_x_os = train_x_os[shuffle_idx]
-# train_y_os = train_y_os[shuffle_idx]
-
-
-cv_scorings = pd.DataFrame(columns=('Round', 'Accuracy', 'Precision', 'Recall', 'F1', 'AUC'))
+cv_scorings = pd.DataFrame(columns=['Round', 'Accuracy', 'Precision', 'Recall', 'F1', 'AUC'])
 
 
 def SVM_tuning(n, X_train, y_train):
     scores = ['accuracy']  # select scores e.g scores = ['recall', 'accuracy']
     grid_param_svm = [
-        {'kernel': ['rbf'], 'gamma': [1e-1, 1e-2, 1e-3, 1e-4], 'C': range(1, 1000), "class_weight": ["balanced"]},
-        {'kernel': ['linear'], 'C': range(1, 1000), "class_weight": ["balanced"]}, ]
+        {'kernel': ['rbf'], 'gamma': [1e-1, 1e-2, 1e-3, 1e-4], 'C': np.arange(0, 1501, 100)[1:],
+         "class_weight": ["balanced"]},
+        {'kernel': ['linear'], 'C': np.arange(0, 1501, 100)[1:], "class_weight": ["balanced"]}, ]
     svm_tuning_info = open(os.path.join(TUNING_DIR, f'SVM_tuning_{n}.txt'), "w")
     for score in scores:
         svm_tuning = GridSearchCV(SVC(random_state=3), grid_param_svm, cv=KFold(3, shuffle=True, random_state=3),
@@ -156,7 +146,7 @@ def data_block_n(i, batch_size):
 
 
 def main():
-    os_rate = 0.5
+    os_rate = 0.6
     ir = float(len(train_negative_genes) / len(train_positive_genes))
     epoch_num = int(ir * os_rate)
     batch_size = int(len(train_negative_genes) / epoch_num)

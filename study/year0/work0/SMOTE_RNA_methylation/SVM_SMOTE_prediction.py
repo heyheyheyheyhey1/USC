@@ -1,5 +1,5 @@
 import random
-
+import numpy as np
 import pandas as pd
 import pickle
 import os
@@ -12,8 +12,8 @@ from sklearn.svm import SVC
 from sklearn.metrics import *
 
 CV_DIR = os.path.join("CV", "SVM")
-MODEL_DIR = os.path.join("model","SVM")
-TUNING_DIR = os.path.join("CV","SVM","tuning")
+MODEL_DIR = os.path.join("model", "SVM")
+TUNING_DIR = os.path.join("CV", "SVM", "tuning")
 if not os.path.exists(MODEL_DIR):
     os.makedirs(MODEL_DIR)
 
@@ -23,8 +23,7 @@ if not os.path.exists(CV_DIR):
 if not os.path.exists(TUNING_DIR):
     os.makedirs(TUNING_DIR)
 
-
-harmonizome_data = "harmonizome_data_combined.tsv"
+# harmonizome_data = "harmonizome_data_combined.tsv"
 selected_data = "selected_dataset.tsv"
 rnmts = "RNMT.list"
 dataset_matrix = os.path.join("data", selected_data)
@@ -34,12 +33,14 @@ positive_genes = [line.rstrip('\n') for line in open(os.path.join("data", rnmts)
 negative_genes = set(all_genes).difference(positive_genes)  # 负样本
 
 selected_data["Y"] = [1 if idx in positive_genes else 0 for idx in selected_data.index.to_list()]
-test_positive_genes = sample(positive_genes, int(0.2 * len(positive_genes)))  # 取正样本20%作为测试
-test_negative_genes = sample(negative_genes, int(0.2 * len(negative_genes)))  # 测试负样本
+test_positive_genes = [line.rstrip('\n') for line in open(os.path.join("data", "test_positive_genes.txt"))]
+test_negative_genes = [line.rstrip('\n') for line in open(os.path.join("data", "test_negative_genes.txt"))]
 train_positive_genes = set(positive_genes).difference(test_positive_genes)
 train_negative_genes = set(negative_genes).difference(test_negative_genes)
 train_positive_frame = selected_data.loc[list(train_positive_genes)]
 train_negative_frame = selected_data.loc[list(train_negative_genes)]
+test_genes = test_positive_genes.append(test_negative_genes)
+
 
 print("all genes num: %d\n" % (len(all_genes)))
 print("test genes num: %d\n" % (len(test_negative_genes) + len(test_positive_genes)))
@@ -55,13 +56,13 @@ random.seed(42)
 # train_y_os = train_y_os[shuffle_idx]
 
 
+cv_scorings = pd.DataFrame(columns=['Round', 'Accuracy', 'Precision', 'Recall', 'F1', 'AUC'])
 
-cv_scorings = pd.DataFrame(columns=('Round', 'Accuracy', 'Precision', 'Recall', 'F1', 'AUC'))
 
 def SVM_tuning(n, X_train, y_train):
     scores = ['accuracy']  # select scores e.g scores = ['recall', 'accuracy']
-    grid_param_svm = [{'kernel': ['rbf'], 'gamma': [1e-1, 1e-2, 1e-3, 1e-4], 'C': range(1, 1000),"class_weight":["balanced"]},
-                      {'kernel': ['linear'], 'C': range(1, 1000),"class_weight":["balanced"]},]
+    grid_param_svm = [{'kernel': ['rbf'], 'gamma': [1e-1, 1e-2, 1e-3, 1e-4], 'C': np.arange(0, 1501, 100)[1:], },
+                      {'kernel': ['linear'], 'C': np.arange(0, 1501, 100)[1:], }, ]
     svm_tuning_info = open(os.path.join(TUNING_DIR, f'SVM_tuning_{n}.txt'), "w")
     for score in scores:
         svm_tuning = GridSearchCV(SVC(random_state=3), grid_param_svm, cv=KFold(3, shuffle=True, random_state=3),
@@ -140,7 +141,7 @@ def data_block_n(i, batch_size):
     block = pd.concat([n_train, train_positive_frame], axis=0)
     block_y = block.iloc[:, -1].values
     block_x = block.iloc[:, 0:-1].values
-    os_x, os_y = SMOTEN(random_state=42).fit_resample(block_x, block_y)
+    os_x, os_y = SMOTE(random_state=42).fit_resample(block_x, block_y)
     out_x, out_y = shuffle(os_x, os_y)
     return out_x, out_y
 
@@ -160,7 +161,7 @@ def main():
                         'F1': f'{pd.to_numeric(cv_scorings["F1"]).mean():.5f}',
                         'AUC': f'{pd.to_numeric(cv_scorings["AUC"]).mean():.5f}'}
     cv_scorings.loc[len(cv_scorings)] = mean_performance
-    cv_scorings.to_csv(os.path.join(CV_DIR, "SVM_benchmark.csv"), index=False, sep="\t")
+    cv_scorings.to_csv(os.path.join(CV_DIR, "SVM_benchmark_smote.csv"), index=False, sep="\t")
 
 
 if __name__ == "__main__":
