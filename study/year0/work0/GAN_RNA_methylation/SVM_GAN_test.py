@@ -3,7 +3,7 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 from sklearn.metrics import *
-
+from random import shuffle
 from tqdm import tqdm
 import pickle
 
@@ -18,7 +18,7 @@ positive_genes = [line.rstrip('\n') for line in open(os.path.join(DATA_DIR, "tes
 negative_genes = [line.rstrip('\n') for line in open(os.path.join(DATA_DIR, "test_negative_genes.txt"))]
 positive_data = selected_data.loc[positive_genes].values
 negative_data = selected_data.loc[negative_genes].values
-
+shuffle(negative_data)
 mdls = os.listdir(MODEL_DIR)
 # indexes = [f'round_{i}.sav' for i in range(len(mdls))]
 columns = ['model','batch_n', 'Accuracy', "Precision", "Recall", "F1"]
@@ -27,8 +27,9 @@ average_pred = pd.DataFrame(columns=columns)
 
 def data_enumerator():
     postv_num = len(positive_data)
-    for i in range(int(len(negative_data) / len(positive_data))):
-        neg_batch = positive_data[i * postv_num:(i + 1) * postv_num]
+    negtv_num = len(negative_data)
+    for i in range(int(negtv_num / postv_num)):
+        neg_batch = negative_data[i * postv_num:(i + 1) * postv_num]
         x = np.concatenate([np.array(neg_batch), positive_data])
         y0 = np.zeros([len(neg_batch), ])
         y1 = np.ones([postv_num, ])
@@ -45,7 +46,7 @@ for mdl in tqdm(mdls):
         average_pred.loc[len(average_pred)] = scorings
 
 average_pred.loc["mean"] = average_pred.mean(numeric_only=True)
-average_pred.to_csv(os.path.join(OUT_DIR, "SVM_SMOTE_test.csv"), index=True)
+average_pred.to_csv(os.path.join(OUT_DIR, "SVM_GAN_test.csv"), index=True)
 
 # fpr, tpr, _ = roc_curve(y, pred, drop_intermediate=False)
 # roc_auc_score = auc(fpr, tpr)

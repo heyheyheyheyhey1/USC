@@ -2,7 +2,7 @@ import os
 import pandas as pd
 import numpy as np
 from sklearn.metrics import *
-
+from random import shuffle
 from tqdm import tqdm
 import pickle
 
@@ -17,6 +17,7 @@ positive_genes = [line.rstrip('\n') for line in open(os.path.join(DATA_DIR, "tes
 negative_genes = [line.rstrip('\n') for line in open(os.path.join(DATA_DIR, "test_negative_genes.txt"))]
 positive_data = selected_data.loc[positive_genes].values
 negative_data = selected_data.loc[negative_genes].values
+shuffle(negative_data)
 
 mdls = os.listdir(MODEL_DIR)
 columns = ['model','batch_n', 'Accuracy', "Precision", "Recall", "F1"]
@@ -25,8 +26,8 @@ average_pred = pd.DataFrame(columns=columns)
 
 def data_enumerator():
     postv_num = len(positive_data)
-    for i in range(int(len(negative_data) / len(positive_data))):
-        neg_batch = positive_data[i * postv_num:(i + 1) * postv_num]
+    for i in range(int(len(negative_data) / postv_num)):
+        neg_batch = negative_data[i * postv_num:(i + 1) * postv_num]
         x = np.concatenate([np.array(neg_batch), positive_data])
         y0 = np.zeros([len(neg_batch), ])
         y1 = np.ones([postv_num, ])

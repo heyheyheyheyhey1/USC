@@ -22,18 +22,18 @@ if not os.path.exists(MODEL_DIR_D):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--n_epochs', type=int, default=1500, help='number of epochs of training')
-    parser.add_argument('--batch_size', type=int, default=12, help='size of the batches')
+    parser.add_argument('--n_epochs', type=int, default=2000, help='number of epochs of training')
+    parser.add_argument('--batch_size', type=int, default=92, help='size of the batches')
     parser.add_argument('--lr', type=float, default=0.00005, help='learning rate')
-    parser.add_argument('--lr_g', type=float, default=0.00001, help='learning rate g')
-    parser.add_argument('--lr_d', type=float, default=0.00001, help='learning rate d')
+    parser.add_argument('--lr_g', type=float, default=0.0001, help='learning rate g')
+    parser.add_argument('--lr_d', type=float, default=0.0001, help='learning rate d')
     parser.add_argument('--n_critic', type=int, default=7, help='number of training steps for discriminator per iter')
     parser.add_argument('--clip_value', type=float, default=0.01, help='lower and upper clip value for disc. weights')
     parser.add_argument('--latent_dim', type=int, default=128, help='dimensionality of the latent space')
     parser.add_argument('--beta1', type=int, default=0.9, help='wgangp optimizer parameter')
     parser.add_argument('--beta2', type=int, default=0.95, help='wgangp optimizer parameter')
     parser.add_argument('--r', type=int, default=5, help='define gradient penalty factor')
-    parser.add_argument('--stop_threshold', type=int, default=0.05, help='early stop c2st threshold')
+    parser.add_argument('--stop_threshold', type=int, default=0.02, help='early stop c2st threshold')
     parser.add_argument('--type', type=str, default="gp", help='GAN type')
     opt = parser.parse_args()
 
@@ -64,7 +64,7 @@ def main():
     fu.close()
 
     args = {}
-    args["train_data"] = positive_data
+    args["train_data"] = selected_data.loc[positive_genes].values
     args["train_opt"] = opt
     args["g_sav_dir"] = MODEL_DIR_G
     args["d_sav_dir"] = MODEL_DIR_D

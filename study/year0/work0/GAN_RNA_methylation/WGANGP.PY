@@ -14,14 +14,20 @@ from sklearn.utils import shuffle
 class Discriminator(nn.Module):
     def __init__(self, in_dim):
         super().__init__()
+
+        def block(in_feat, out_feat, normalize=False):
+            layers = [nn.Linear(in_feat, out_feat)]
+            if normalize:
+                layers.append(nn.BatchNorm1d(out_feat, 0.8))
+            layers.append(nn.LeakyReLU(0.2, inplace=True))
+            # layers.append(nn.Dropout(p=0.5))
+            return layers
+
         self.model = nn.Sequential(
-            nn.Linear(in_dim, 1024),
-            nn.LeakyReLU(0.2, inplace=True),
-            nn.Linear(1024, 512),
-            nn.LeakyReLU(0.2, inplace=True),
-            nn.Linear(512, 128),
-            nn.LeakyReLU(0.2, inplace=True),
-            nn.Linear(128, 1)
+            *block(in_dim, in_dim // 2),
+            *block(in_dim // 2, in_dim // 2 // 2),
+            *block(in_dim // 2 // 2, in_dim // 2 // 2 // 2),
+            nn.Linear(in_dim // 2 // 2 // 2, 1)
         )
 
     def forward(self, x):
@@ -32,10 +38,19 @@ class Discriminator(nn.Module):
 class Generator(nn.Module):
     def __init__(self, in_dim, out_dim):
         super().__init__()
+
+        def block(in_feat, out_feat, normalize=False):
+            layers = [nn.Linear(in_feat, out_feat)]
+            if normalize:
+                layers.append(nn.BatchNorm1d(out_feat, 0.8))
+            # layers.append(nn.LeakyReLU(0.2, inplace=True))
+            return layers
+
         self.model = nn.Sequential(
-            nn.Linear(in_dim, 512),
-            nn.Linear(512, 1024),
-            nn.Linear(1024, out_dim),
+            *block(in_dim, in_dim * 2),
+            *block(in_dim * 2, in_dim * 2 * 2),
+            *block(in_dim * 2 * 2, in_dim * 2 * 2 * 2),
+            *block(in_dim * 2 * 2 * 2, out_dim),
             nn.Tanh()
         )
 
@@ -69,7 +84,9 @@ class WGANGP():
         self.losses_D = []
 
     def cal_gradient_penalty(self, real_data, fake_data):
-        alpha = torch.Tensor(np.random.random(real_data.shape)).to(self.device)
+        alpha = torch.rand(real_data.size(0), 1)
+        alpha = alpha.expand(real_data.size())
+        alpha = alpha.to(self.device)
         interpolates = (alpha * real_data + ((1 - alpha) * fake_data)).requires_grad_(True)
         d_interpolates = self.discriminator(interpolates)
         gradients = torch.autograd.grad(
@@ -161,7 +178,7 @@ class WGANGP():
                                     f'generator_n_{n_epoch}_acc_{acc:.3f}.pth'))
             torch.save(self.discriminator.state_dict(),
                        os.path.join(self.d_save_dir,
-                                    f'discriminator_n_{n_epoch}_acc_{acc:.3f}.pth'%acc))
+                                    f'discriminator_n_{n_epoch}_acc_{acc:.3f}.pth' % acc))
             print("\n[Epoch %d/%d] [D loss: %f] [G loss: %f] [GP: %f] [C2ST: %f] " % (n_epoch, self.train_opt.n_epochs,
                                                                                       torch.mean(
                                                                                           torch.FloatTensor(
