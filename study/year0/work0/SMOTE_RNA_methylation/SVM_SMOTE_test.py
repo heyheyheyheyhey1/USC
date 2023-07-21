@@ -5,10 +5,11 @@ from sklearn.metrics import *
 from random import shuffle
 from tqdm import tqdm
 import pickle
-
 DATA_DIR = os.path.join("data")
-MODEL_DIR = os.path.join("model", "SVM")
+MODEL_DIR = os.path.join("model")
 OUT_DIR = os.path.join("result")
+CLASSIFIER_NAMES = ['GB', 'GNB', 'LR', 'RF', 'SVM']
+
 
 selected_data = "selected_dataset.tsv"
 dataset_matrix = os.path.join(DATA_DIR, selected_data)
@@ -19,8 +20,7 @@ positive_data = selected_data.loc[positive_genes].values
 negative_data = selected_data.loc[negative_genes].values
 shuffle(negative_data)
 
-mdls = os.listdir(MODEL_DIR)
-columns = ['model','batch_n', 'Accuracy', "Precision", "Recall", "F1"]
+columns = ['model', 'batch_n', 'Accuracy', "Precision", "Recall", "F1"]
 average_pred = pd.DataFrame(columns=columns)
 
 
@@ -35,16 +35,22 @@ def data_enumerator():
         yield x, y, i
 
 
-for mdl in tqdm(mdls):
-    svc = pickle.load(open(os.path.join(MODEL_DIR, mdl), 'rb'))
-    for x, y, i in data_enumerator():
-        pred = svc.predict(x)
-        scorings = [mdl,f"batch_{i}", accuracy_score(y, pred), precision_score(y, pred), recall_score(y, pred),
-                    f1_score(y, pred)]
-        average_pred.loc[len(average_pred)] = scorings
+for classifier in tqdm(CLASSIFIER_NAMES):
+    for mdl in os.listdir(os.path.join(MODEL_DIR, classifier)):
+        for x, y, i in data_enumerator():
+            model = pickle.load(open(os.path.join(MODEL_DIR, classifier, mdl), 'rb'))
+            pred = model.predict(x)
+            score = [classifier, f"batch_{i}", accuracy_score(y, pred), precision_score(y, pred), recall_score(y, pred),
+                     f1_score(y, pred)]
+            average_pred.loc[len(average_pred)] = score
 
-average_pred.loc["mean"] = average_pred.mean(numeric_only=True)
-average_pred.to_csv(os.path.join(OUT_DIR, "SVM_SMOTE_test.csv"), index=True)
+average_pred.round(4)
+
+for classifier in tqdm(CLASSIFIER_NAMES):
+    test_pd = average_pred[average_pred["model"] == classifier].copy()
+    test_pd.loc[len(test_pd)] = test_pd.mean(numeric_only=True,skipna=True)
+    test_pd.to_csv(os.path.join(OUT_DIR, f"{classifier}_SMOTE_test.csv"), index=True, sep="\t")
+
 
 # fpr, tpr, _ = roc_curve(y, pred, drop_intermediate=False)
 # roc_auc_score = auc(fpr, tpr)

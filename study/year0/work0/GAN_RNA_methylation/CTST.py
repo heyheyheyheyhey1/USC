@@ -13,7 +13,8 @@ from tqdm import tqdm
 
 DATA_DIR = os.path.join("data")
 MODEL_DIR = os.path.join("model", "wgangp")
-generator = Generator(in_dim=128, out_dim=1517)
+LATENT_DIM = 128
+generator = Generator(in_dim=LATENT_DIM, out_dim=1517)
 
 selected_data = "selected_dataset.tsv"
 rnmts = "test_positive_genes.txt"
@@ -38,9 +39,9 @@ for mdl in tqdm(mdls):
 
     SVM_model = SVC()
     scorings = {'accuracy': make_scorer(accuracy_score)}
-    for i in range(20):
+    for i in range(200):
         # 生成数据
-        synthetic_data = generator(torch.rand([19, 128]))
+        synthetic_data = generator(torch.rand([19, LATENT_DIM]))
         x = np.concatenate([synthetic_data.detach(), positive_data])
 
         # 定义y
@@ -53,7 +54,7 @@ for mdl in tqdm(mdls):
         acc_average.loc[mdl, f'round_{i}'] = cv_result["test_accuracy"].mean()
 
     acc_average.loc[mdl, "mean"] = acc_average.loc[mdl].mean().round(5)
-    acc_average.loc[mdl, "var"] = acc_average.loc[mdl].var().round(5)
+    acc_average.loc[mdl, "var"] = np.float64(acc_average.loc[mdl].var()).round(5)
     acc_average.loc[mdl, "threshold"] = abs(acc_average.loc[mdl].mean() - 0.5).round(5)
 
 # 导出
@@ -67,7 +68,7 @@ generator.load_state_dict(torch.load(os.path.join(MODEL_DIR, "generator", select
 generator.eval()
 
 # 生成数据
-synthetic_data = generator(torch.rand([19, 128]))
+synthetic_data = generator(torch.rand([19, LATENT_DIM]))
 # 保存数据
 # pd.DataFrame(synthetic_data.detach().numpy()).to_csv(os.path.join(DATA_DIR, "synthetic_data.csv"))
 y0 = np.zeros([19, ])

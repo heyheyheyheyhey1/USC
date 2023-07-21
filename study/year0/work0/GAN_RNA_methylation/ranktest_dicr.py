@@ -10,7 +10,7 @@ from sklearn.metrics import roc_curve, auc, roc_auc_score
 DATA_DIR = os.path.join("data")
 MODEL_DIR = os.path.join("model", "wgangp")
 discriminator = Discriminator(in_dim=1517)
-discriminator.load_state_dict(torch.load(os.path.join(MODEL_DIR, "discriminator", "discriminator_n_1379_acc_0.479.pth")))
+discriminator.load_state_dict(torch.load(os.path.join(MODEL_DIR, "discriminator", "discriminator_n_1355_acc_0.459.pth")))
 discriminator.eval()
 
 selected_data = "selected_dataset.tsv"

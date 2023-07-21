@@ -12,43 +12,31 @@ from sklearn.model_selection import *
 from sklearn.ensemble import GradientBoostingClassifier
 from sklearn.metrics import *
 import numpy as np
-CV_DIR = os.path.join("CV", "AL")
-
-MODEL_DIR = os.path.join("model","AL")
-if not os.path.exists(MODEL_DIR):
-    os.makedirs(MODEL_DIR)
+CV_DIR = os.path.join("CV")
+MODEL_DIR = os.path.join("model")
+DATA_DIR = os.path.join("data")
+TUNING_DIR = os.path.join("TUNING")
 if not os.path.exists(CV_DIR):
     os.makedirs(CV_DIR)
-
 selected_data = "selected_dataset.tsv"
 rnmts = "RNMT.list"
 dataset_matrix = os.path.join("data", selected_data)
 selected_data = pd.read_csv(dataset_matrix, delimiter="\t", index_col=0, low_memory=False)
-
 all_genes = selected_data.index.unique().to_list()
 positive_genes = [line.rstrip('\n') for line in open(os.path.join("data", rnmts))]
 negative_genes = set(all_genes).difference(positive_genes)  # 负样本
 
 selected_data["Y"] = [1 if idx in positive_genes else 0 for idx in selected_data.index.to_list()]
-test_positive_genes = sample(positive_genes, int(0.2 * len(positive_genes)))  # 取正样本20%作为测试
-test_negative_genes = sample(negative_genes, int(0.2 * len(negative_genes)))  # 测试负样本
+test_positive_genes = [line.rstrip('\n') for line in open(os.path.join(DATA_DIR, "test_positive_genes.txt"))]
+test_negative_genes = [line.rstrip('\n') for line in open(os.path.join(DATA_DIR, "test_negative_genes.txt"))]
 train_positive_genes = set(positive_genes).difference(test_positive_genes)
 train_negative_genes = set(negative_genes).difference(test_negative_genes)
 train_positive_frame = selected_data.loc[list(train_positive_genes)]
 train_negative_frame = selected_data.loc[list(train_negative_genes)]
 
+
 print("all genes num: %d\n" % (len(all_genes)))
 print("test genes num: %d\n" % (len(test_negative_genes) + len(test_positive_genes)))
-
-random.seed(42)
-
-# print("positive num before oversample: %d" % (len(train_y)))
-# train_x_os, train_y_os = SMOTEN(random_state=42, sampling_strategy={1: 2000}).fit_resample(train_x, train_y)
-# print("length after oversample: %d" % (len(train_x_os)))
-
-# shuffle_idx = shuffle(range(len(train_x_os)))
-# train_x_os = train_x_os[shuffle_idx]
-# train_y_os = train_y_os[shuffle_idx]
 
 
 def mod_tunning(n, X_train, y_train):
@@ -63,7 +51,7 @@ def mod_tunning(n, X_train, y_train):
     for i in range(query_num):
         query_idx, query_result = learner.query(X_train)
         learner.teach(X_train[query_idx], y_train[query_idx])
-    return learner
+    return learner.estimator
 
 
 cv_scorings = pd.DataFrame(columns=('Round', 'Accuracy', 'Precision', 'Recall', 'F1', 'AUC'))
@@ -77,7 +65,7 @@ def train_one_epoch(X, Y, n):
                 'f1_score': make_scorer(f1_score),
                 'auc': 'roc_auc'}
 
-    scores = cross_validate(estimator=AL_model.estimator, X=X, y=Y, cv=10, scoring=scorings, n_jobs=12)
+    scores = cross_validate(estimator=AL_model, X=X, y=Y, cv=10, scoring=scorings, n_jobs=12)
     pickle.dump(AL_model, open(os.path.join(MODEL_DIR, f'round_{n}.sav'), 'wb'))
     classifier_performance = {'Round': n,
                               'Accuracy': f'{scores["test_accuracy"].mean():.5f}',
@@ -108,7 +96,7 @@ def data_block_n(i, batch_size):
 
 
 def main():
-    os_rate = 0.6
+    os_rate = 1
     ir = float(len(train_negative_genes) / len(train_positive_genes))
     epoch_num = int(ir * os_rate)
     batch_size = int(len(train_negative_genes) / epoch_num)
@@ -122,7 +110,7 @@ def main():
                         'F1': f'{pd.to_numeric(cv_scorings["F1"]).mean():.5f}',
                         'AUC': f'{pd.to_numeric(cv_scorings["AUC"]).mean():.5f}'}
     cv_scorings.loc[len(cv_scorings)] = mean_performance
-    cv_scorings.to_csv(os.path.join(CV_DIR, "AL_benchmark.csv"), index=False, sep="\t")
+    cv_scorings.to_csv(os.path.join(CV_DIR, "AL_CV.csv"), index=False, sep="\t")
 
 if __name__ == "__main__":
     main()

@@ -4,26 +4,31 @@ import pandas as pd
 import pickle
 import os
 from random import sample
+
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.linear_model import LogisticRegression
+from sklearn.naive_bayes import GaussianNB
 from sklearn.utils import shuffle
+from sklearn.ensemble import GradientBoostingClassifier
 import tqdm
 from imblearn.over_sampling import *
 from sklearn.model_selection import *
 from sklearn.svm import SVC
 from sklearn.metrics import *
 
-CV_DIR = os.path.join("CV", "SVM")
-MODEL_DIR = os.path.join("model", "SVM")
-TUNING_DIR = os.path.join("CV", "SVM", "tuning")
-if not os.path.exists(MODEL_DIR):
-    os.makedirs(MODEL_DIR)
-
+CV_DIR = os.path.join("CV")
+MODEL_DIR = os.path.join("model")
+TUNING_DIR = os.path.join("TUNING")
+CLASSIFIER_NAMES = ['SVM', 'GB', 'GNB', 'LR', 'RF']
 if not os.path.exists(CV_DIR):
     os.makedirs(CV_DIR)
 
-if not os.path.exists(TUNING_DIR):
-    os.makedirs(TUNING_DIR)
+for name in CLASSIFIER_NAMES:
+    if not os.path.exists(os.path.join(MODEL_DIR, name)):
+        os.makedirs(os.path.join(MODEL_DIR, name))
+    if not os.path.exists(os.path.join(TUNING_DIR, name)):
+        os.makedirs(os.path.join(TUNING_DIR, name))
 
-# harmonizome_data = "harmonizome_data_combined.tsv"
 selected_data = "selected_dataset.tsv"
 rnmts = "RNMT.list"
 dataset_matrix = os.path.join("data", selected_data)
@@ -39,7 +44,7 @@ train_positive_genes = set(positive_genes).difference(test_positive_genes)
 train_negative_genes = set(negative_genes).difference(test_negative_genes)
 train_positive_frame = selected_data.loc[list(train_positive_genes)]
 train_negative_frame = selected_data.loc[list(train_negative_genes)]
-test_genes = test_positive_genes.append(test_negative_genes)
+# test_genes = test_positive_genes.append(test_negative_genes)
 
 
 print("all genes num: %d\n" % (len(all_genes)))
@@ -47,23 +52,17 @@ print("test genes num: %d\n" % (len(test_negative_genes) + len(test_positive_gen
 
 random.seed(42)
 
-# print("positive num before oversample: %d" % (len(train_y)))
-# train_x_os, train_y_os = SMOTEN(random_state=42, sampling_strategy={1: 2000}).fit_resample(train_x, train_y)
-# print("length after oversample: %d" % (len(train_x_os)))
-
-# shuffle_idx = shuffle(range(len(train_x_os)))
-# train_x_os = train_x_os[shuffle_idx]
-# train_y_os = train_y_os[shuffle_idx]
-
-
-cv_scorings = pd.DataFrame(columns=['Round', 'Accuracy', 'Precision', 'Recall', 'F1', 'AUC'])
+cv_scorings = pd.DataFrame(columns=['Classifier', 'Accuracy', 'Precision', 'Recall', 'F1', 'AUC'])
 
 
 def SVM_tuning(n, X_train, y_train):
     scores = ['accuracy']  # select scores e.g scores = ['recall', 'accuracy']
     grid_param_svm = [{'kernel': ['rbf'], 'gamma': [1e-1, 1e-2, 1e-3, 1e-4], 'C': np.arange(0, 1501, 100)[1:], },
                       {'kernel': ['linear'], 'C': np.arange(0, 1501, 100)[1:], }, ]
-    svm_tuning_info = open(os.path.join(TUNING_DIR, f'SVM_tuning_{n}.txt'), "w")
+    if not os.path.exists(os.path.join(TUNING_DIR,"SVM")):
+        os.makedirs(os.path.join(TUNING_DIR,"SVM"))
+
+    svm_tuning_info = open(os.path.join(TUNING_DIR,"SVM", f'SVM_tuning_{n}.txt'), "w")
     for score in scores:
         svm_tuning = GridSearchCV(SVC(random_state=3), grid_param_svm, cv=KFold(3, shuffle=True, random_state=3),
                                   scoring='%s' % score, n_jobs=12)
@@ -86,54 +85,183 @@ def SVM_tuning(n, X_train, y_train):
     return (svm_tuning.best_params_)
 
 
+def RF_tuning(n, X_train, y_train):
+    scores = ['accuracy']  # select scores e.g scores = ['recall', 'accuracy']
+    n_estimators = [500, 1000, 1500, 2500, 5000]
+    grid_param_rf = {'n_estimators': n_estimators}
+    if not os.path.exists(os.path.join(TUNING_DIR,"RF")):
+        os.makedirs(os.path.join(TUNING_DIR,"RF"))
+    rf_tuning_info = open(os.path.join(TUNING_DIR,"RF", f'RF_tuning_n{n}.txt'), "w")
+    for score in scores:
+        rf_tuning = GridSearchCV(RandomForestClassifier(random_state=3), grid_param_rf,
+                                 cv=KFold(3, shuffle=True, random_state=3), scoring='%s' % score, n_jobs=12)
+        rf_tuning.fit(X_train, y_train)
+
+        print("# Tuning hyper-parameters for %s" % score, file=rf_tuning_info)
+        print("Best parameters set found on training set:", file=rf_tuning_info)
+        print(rf_tuning.best_params_, file=rf_tuning_info)
+        print(file=rf_tuning_info)
+        print("Grid scores on training set:", file=rf_tuning_info)
+        means = rf_tuning.cv_results_['mean_test_score']
+        stds = rf_tuning.cv_results_['std_test_score']
+        for mean, std, params in zip(means, stds, rf_tuning.cv_results_['params']):
+            print("%0.3f (+/-%0.03f) for %r" % (mean, std * 2, params), file=rf_tuning_info)
+        print(file=rf_tuning_info)
+
+    print("Selected parameters:", file=rf_tuning_info)
+    print(rf_tuning.best_params_, file=rf_tuning_info)
+    print(file=rf_tuning_info)
+
+    max_features = ['sqrt', 'log2']
+    max_depth = [10, 20, 30, 40, 50]
+    max_depth.append(None)
+    min_samples_split = [2, 5, 10, 15, 20]
+    min_samples_leaf = [1, 2, 5, 10, 15]
+    grid_param_rf_random = {'max_features': max_features,
+                            'max_depth': max_depth,
+                            'min_samples_split': min_samples_split,
+                            'min_samples_leaf': min_samples_leaf}
+    for score in scores:
+        rf_random = RandomizedSearchCV(
+            estimator=RandomForestClassifier(n_estimators=rf_tuning.best_params_['n_estimators'], random_state=3),
+            param_distributions=grid_param_rf_random, n_iter=100, cv=KFold(3, shuffle=True, random_state=3), verbose=0,
+            scoring='%s' % score, n_jobs=12)
+        rf_random.fit(X_train, y_train)
+
+        print("# Randomized search for other hyper-parameters", file=rf_tuning_info)
+        print("Best parameters set found on training set:", file=rf_tuning_info)
+        print(rf_random.best_params_, file=rf_tuning_info)
+        print(file=rf_tuning_info)
+        print("Randomized search scores on training set:", file=rf_tuning_info)
+        means = rf_random.cv_results_['mean_test_score']
+        stds = rf_random.cv_results_['std_test_score']
+        for mean, std, params in zip(means, stds, rf_random.cv_results_['params']):
+            print("%0.3f (+/-%0.03f) for %r" % (mean, std * 2, params), file=rf_tuning_info)
+        print(file=rf_tuning_info)
+
+    print("Selected parameters:", file=rf_tuning_info)
+    print(rf_random.best_params_, file=rf_tuning_info)
+    rf_tuning_info.close()
+
+    rf_tuning.best_params_.update(rf_random.best_params_)
+    return (rf_tuning.best_params_)
+
+
+def GM_tuning(n, X_train, y_train):
+    scores = ['accuracy']  # select scores e.g scores = ['recall', 'accuracy']
+    n_estimators = [10, 20, 30, 40, 50, 60, 70, 80, 90, 100]
+    learning_rate = [0.05, 0.1, 0.2]
+    grid_param_gbm = {'n_estimators': n_estimators,
+                      'learning_rate': learning_rate}
+    if not os.path.exists(os.path.join(TUNING_DIR,"GB")):
+        os.makedirs(os.path.join(TUNING_DIR,"GB"))
+    gbm_tuning_info = open(os.path.join(TUNING_DIR,"GB", f'GB_tuning_n{n}.txt'), "w")
+    for score in scores:
+        gbm_tuning = GridSearchCV(GradientBoostingClassifier(subsample=0.8, random_state=3), grid_param_gbm,
+                                  cv=KFold(3, shuffle=True, random_state=3), scoring='%s' % score, n_jobs=12)
+        gbm_tuning.fit(X_train, y_train)
+
+        print("# Tuning hyper-parameters for %s" % score, file=gbm_tuning_info)
+        print("Best parameters set found on training set:", file=gbm_tuning_info)
+        print(gbm_tuning.best_params_, file=gbm_tuning_info)
+        print(file=gbm_tuning_info)
+        print("Grid scores on training set:", file=gbm_tuning_info)
+        means = gbm_tuning.cv_results_['mean_test_score']
+        stds = gbm_tuning.cv_results_['std_test_score']
+        for mean, std, params in zip(means, stds, gbm_tuning.cv_results_['params']):
+            print("%0.3f (+/-%0.03f) for %r" % (mean, std * 2, params), file=gbm_tuning_info)
+        print(file=gbm_tuning_info)
+
+    print("Selected parameters:", file=gbm_tuning_info)
+    print(gbm_tuning.best_params_, file=gbm_tuning_info)
+    print(file=gbm_tuning_info)
+
+    max_features = [ 'sqrt', 'log2']
+    max_depth = [3, 5, 8, 10, 20]
+    min_samples_split = [2, 5, 10, 15, 20]
+    min_samples_leaf = [1, 2, 5, 10, 15]
+    grid_param_gmb_random = {'max_features': max_features,
+                             'max_depth': max_depth,
+                             'min_samples_split': min_samples_split,
+                             'min_samples_leaf': min_samples_leaf}
+
+    for score in scores:
+        gbm_random = RandomizedSearchCV(
+            estimator=GradientBoostingClassifier(n_estimators=gbm_tuning.best_params_['n_estimators'], subsample=0.8,
+                                                 random_state=3), param_distributions=grid_param_gmb_random, n_iter=100,
+            cv=KFold(3, shuffle=True, random_state=3), verbose=0, scoring='%s' % score, n_jobs=12)
+        gbm_random.fit(X_train, y_train)
+
+        print("# Randomized search for other hyper-parameters", file=gbm_tuning_info)
+        print("Best parameters set found on training set:", file=gbm_tuning_info)
+        print(gbm_random.best_params_, file=gbm_tuning_info)
+        print(file=gbm_tuning_info)
+        print("Randomized search scores on training set:", file=gbm_tuning_info)
+        means = gbm_random.cv_results_['mean_test_score']
+        stds = gbm_random.cv_results_['std_test_score']
+        for mean, std, params in zip(means, stds, gbm_random.cv_results_['params']):
+            print("%0.3f (+/-%0.03f) for %r" % (mean, std * 2, params), file=gbm_tuning_info)
+        print(file=gbm_tuning_info)
+
+    print("Selected parameters:", file=gbm_tuning_info)
+    print(gbm_random.best_params_, file=gbm_tuning_info)
+    gbm_tuning_info.close()
+
+    gbm_tuning.best_params_.update(gbm_random.best_params_)
+    return (gbm_tuning.best_params_)
+
+
 def train_one_epoch(X, Y, n):
-    tuning = SVM_tuning(n, X, Y)
+    svm_tuning = SVM_tuning(n, X, Y)
+    rf_tuning = RF_tuning(n, X, Y)
+    gm_tuning = GM_tuning(n, X, Y)
+    LR_model = LogisticRegression(solver='lbfgs', random_state=5)
+    GNB_model = GaussianNB()
     scorings = {'accuracy': make_scorer(accuracy_score),
                 'recall': make_scorer(recall_score),
                 'precision': make_scorer(precision_score),
                 'f1_score': make_scorer(f1_score),
                 'auc': 'roc_auc'}
-    if tuning['kernel'] == 'rbf':
-        SVM_model = SVC(C=tuning['C'],
-                        gamma=tuning['gamma'],
-                        kernel=tuning['kernel'],
+    if svm_tuning['kernel'] == 'rbf':
+        SVM_model = SVC(C=svm_tuning['C'],
+                        gamma=svm_tuning['gamma'],
+                        kernel=svm_tuning['kernel'],
                         probability=True,
                         random_state=5)
-    elif tuning['kernel'] == 'linear':
-        SVM_model = SVC(C=tuning['C'],
-                        kernel=tuning['kernel'],
+    elif svm_tuning['kernel'] == 'linear':
+        SVM_model = SVC(C=svm_tuning['C'],
+                        kernel=svm_tuning['kernel'],
                         probability=True,
                         random_state=5)
-    scores = cross_validate(estimator=SVM_model, X=X, y=Y, cv=10, scoring=scorings, n_jobs=12)
-    model = SVM_model.fit(X, Y)
-    # pred_y = SVM_model.predict(all_x)
-    # accuracy = accuracy_score(all_y,pred_y)
-    # precision = precision_score(all_y, pred_y)
-    # recall = recall_score(all_y, pred_y)
-    # f1 = f1_score(all_y, pred_y)
 
-    pickle.dump(model, open(os.path.join(MODEL_DIR, f'round_{n}.sav'), 'wb'))
-    classifier_performance = {'Round': n,
-                              'Accuracy': f'{scores["test_accuracy"].mean():.5f}',
-                              'Precision': f'{scores["test_precision"].mean():.5f}',
-                              'Recall': f'{scores["test_recall"].mean():.5f}',
-                              'F1': f'{scores["test_f1_score"].mean():.5f} ',
-                              'AUC': f'{scores["test_auc"].mean():.5f}'}
-    cv_scorings.loc[len(cv_scorings)] = classifier_performance
+    RFC_model = RandomForestClassifier(n_estimators=rf_tuning['n_estimators'],
+                                       min_samples_split=rf_tuning['min_samples_split'],
+                                       min_samples_leaf=rf_tuning['min_samples_leaf'],
+                                       max_features=rf_tuning['max_features'],
+                                       max_depth=rf_tuning['max_depth'],
+                                       random_state=5)
+    GBM_model = GradientBoostingClassifier(n_estimators=gm_tuning['n_estimators'],
+                                           learning_rate=gm_tuning['learning_rate'],
+                                           subsample=0.8,
+                                           min_samples_split=gm_tuning['min_samples_split'],
+                                           min_samples_leaf=gm_tuning['min_samples_leaf'],
+                                           max_features=gm_tuning['max_features'],
+                                           max_depth=gm_tuning['max_depth'],
+                                           random_state=5)
 
-    if (n % 3 == 0):
-        # print(f"round_{n + 1} result :\n")
-        # print(f'accuracy:{accuracy}')
-        # print(f'precision:{precision}')
-        # print(f'recall:{recall}')
-        # print(f'f1:{f1}')
-        print(f'\naccuracy:{scores["test_accuracy"].mean():.5f} (+/- {(scores["test_accuracy"].std() * 2):.5f})')
-        print(f'Precision:{scores["test_precision"].mean():.5f} (+/- {(scores["test_precision"].std() * 2):.5f})')
-        print(f'Recall:{scores["test_recall"].mean():.5f} (+/- {(scores["test_recall"].std() * 2):.5f})')
-        print(f'F1:{scores["test_f1_score"].mean():.5f} (+/- {(scores["test_f1_score"].std() * 2):.5f})')
-        print(f'AUC:{scores["test_auc"].mean():.5f} (+/- {(scores["test_auc"].std() * 2):.5f})')
+    for classifier, name in [(LR_model, 'LR'),(GNB_model, 'GNB'),(SVM_model, 'SVM'),(RFC_model, 'RF'),(GBM_model, 'GB')]:
+        scores = cross_validate(estimator=classifier, X=X, y=Y, cv=10, scoring=scorings, n_jobs=12)
+        model = classifier.fit(X, Y)
 
-    return model
+        pickle.dump(model, open(os.path.join(MODEL_DIR,name, f'round_{n}.sav'), 'wb'))
+        classifier_performance = {'Classifier': name,
+                                  'Accuracy': float(f'{scores["test_accuracy"].mean():.5f}'),
+                                  'Precision': float(f'{scores["test_precision"].mean():.5f}'),
+                                  'Recall': float(f'{scores["test_recall"].mean():.5f}'),
+                                  'F1': float(f'{scores["test_f1_score"].mean():.5f} '),
+                                  'AUC': float(f'{scores["test_auc"].mean():.5f}')}
+        cv_scorings.loc[len(cv_scorings)] = classifier_performance
+    return
 
 
 def data_block_n(i, batch_size):
@@ -147,21 +275,19 @@ def data_block_n(i, batch_size):
 
 
 def main():
-    os_rate = 0.6
+    os_rate = 0.5
     ir = float(len(train_negative_genes) / len(train_positive_genes))
     epoch_num = int(ir * os_rate)
     batch_size = int(len(train_negative_genes) / epoch_num)
     for i in tqdm.tqdm(range(epoch_num)):
         x, y = data_block_n(i, batch_size)
         train_one_epoch(x, y, i)
-    mean_performance = {'Round': 'MEAN',
-                        'Accuracy': f'{pd.to_numeric(cv_scorings["Accuracy"]).mean():.5f}',
-                        'Precision': f'{pd.to_numeric(cv_scorings["Precision"]).mean():.5f}',
-                        'Recall': f'{pd.to_numeric(cv_scorings["Recall"]).mean():.5f}',
-                        'F1': f'{pd.to_numeric(cv_scorings["F1"]).mean():.5f}',
-                        'AUC': f'{pd.to_numeric(cv_scorings["AUC"]).mean():.5f}'}
-    cv_scorings.loc[len(cv_scorings)] = mean_performance
-    cv_scorings.to_csv(os.path.join(CV_DIR, "SVM_benchmark_smote.csv"), index=False, sep="\t")
+
+    for name in CLASSIFIER_NAMES:
+        cv_pd = cv_scorings[cv_scorings["Classifier"] == name].copy()
+        cv_pd.loc[len(cv_pd)] = cv_pd.mean(numeric_only=True)
+        cv_pd.to_csv(os.path.join(CV_DIR, f"{name}_SMOTE_CV.csv"), index=False, sep="\t")
+
 
 
 if __name__ == "__main__":
