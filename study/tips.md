@@ -21,3 +21,13 @@
 # 2023-06-27
 - Positive-Unlabeled Learning with Adversarial Data Augmentation for Knowledge Graph Completion
 - 修改discriminator ，变成几层NN
+
+# 2023-07-12
+- 就先用WGAN-GP写一篇文章投出去，1.要么全部做交叉验证，不要写tuning 超参过程，2.要么划分训练，验证，测试，验证用来选择超参（我建议用后面这种）
+- 你现在保留所有结果，你先不用花太多时间在画实验结果图上，之后我再看看
+- 你用excel存结果，直接在excel上截个图给结果给我看就好
+- 你把全连接层换成self attention看下结果
+
+# 2023-07-19
+- 你写的同时，可以尝试着用些geneformer，最好自己能复现里面的一些实验结果
+- 用训练好的geneformer，做论文里的downstream task实验
