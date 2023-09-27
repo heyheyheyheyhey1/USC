@@ -5,11 +5,15 @@ from sklearn.metrics import *
 from random import shuffle
 from tqdm import tqdm
 import pickle
+from datetime import datetime
+
 DATA_DIR = os.path.join("data")
 MODEL_DIR = os.path.join("model")
-OUT_DIR = os.path.join("result")
+OUT_DIR = os.path.join("result", datetime.now().strftime("%Y-%m-%d %Hh%Mm"))
 CLASSIFIER_NAMES = ['GB', 'GNB', 'LR', 'RF', 'SVM']
 
+if not os.path.exists(OUT_DIR):
+    os.makedirs(OUT_DIR)
 
 selected_data = "selected_dataset.tsv"
 dataset_matrix = os.path.join(DATA_DIR, selected_data)
@@ -20,8 +24,8 @@ positive_data = selected_data.loc[positive_genes].values
 negative_data = selected_data.loc[negative_genes].values
 shuffle(negative_data)
 
-columns = ['model', 'batch_n', 'Accuracy', "Precision", "Recall", "F1"]
-average_pred = pd.DataFrame(columns=columns)
+average_pred = pd.DataFrame(columns=['model', 'batch_n', 'Accuracy', "Precision", "Recall", "F1"])
+pd_results = pd.DataFrame(columns=['model', 'Accuracy', "Precision", "Recall", "F1"])
 
 
 def data_enumerator():
@@ -36,7 +40,7 @@ def data_enumerator():
 
 
 for classifier in tqdm(CLASSIFIER_NAMES):
-    for mdl in os.listdir(os.path.join(MODEL_DIR, classifier)):
+    for mdl in tqdm(os.listdir(os.path.join(MODEL_DIR, classifier))):
         for x, y, i in data_enumerator():
             model = pickle.load(open(os.path.join(MODEL_DIR, classifier, mdl), 'rb'))
             pred = model.predict(x)
@@ -48,9 +52,13 @@ average_pred.round(4)
 
 for classifier in tqdm(CLASSIFIER_NAMES):
     test_pd = average_pred[average_pred["model"] == classifier].copy()
-    test_pd.loc[len(test_pd)] = test_pd.mean(numeric_only=True,skipna=True)
+    mean = test_pd.mean(numeric_only=True, skipna=True)
+    mean.loc["model"] = classifier
+    pd_results.loc[len(pd_results)] = mean
     test_pd.to_csv(os.path.join(OUT_DIR, f"{classifier}_SMOTE_test.csv"), index=True, sep="\t")
 
+pd_results.loc[len(pd_results)] = pd_results.mean()
+pd_results.to_csv(os.path.join(OUT_DIR, f"SMOTE_test.csv"), sep="\t")
 
 # fpr, tpr, _ = roc_curve(y, pred, drop_intermediate=False)
 # roc_auc_score = auc(fpr, tpr)

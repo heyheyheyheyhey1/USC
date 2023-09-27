@@ -1,14 +1,18 @@
 import torch
 import argparse
+
+from sklearn.exceptions import UndefinedMetricWarning
 from torch import nn
 import pickle
 import numpy as np
 import pandas as pd
 from WGAN import WGAN
 from WGANGP import WGANGP
+# from AttentionGan import WGANGP as AttGan
 from random import sample
 import os
-
+import warnings
+warnings.filterwarnings('ignore', category=UndefinedMetricWarning)
 
 DATA_DIR = os.path.join("data")
 MODEL_DIR = os.path.join("model","wgangp")
@@ -22,12 +26,12 @@ if not os.path.exists(MODEL_DIR_D):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--n_epochs', type=int, default=2000, help='number of epochs of training')
-    parser.add_argument('--batch_size', type=int, default=92, help='size of the batches')
+    parser.add_argument('--n_epochs', type=int, default=5000, help='number of epochs of training')
+    parser.add_argument('--batch_size', type=int, default=73, help='size of the batches')
     parser.add_argument('--lr', type=float, default=0.00005, help='learning rate')
     parser.add_argument('--lr_g', type=float, default=0.0001, help='learning rate g')
-    parser.add_argument('--lr_d', type=float, default=0.0001, help='learning rate d')
-    parser.add_argument('--n_critic', type=int, default=7, help='number of training steps for discriminator per iter')
+    parser.add_argument('--lr_d', type=float, default=0.00005, help='learning rate d')
+    parser.add_argument('--n_critic', type=int, default=50, help='number of training steps for discriminator per iter')
     parser.add_argument('--clip_value', type=float, default=0.01, help='lower and upper clip value for disc. weights')
     parser.add_argument('--latent_dim', type=int, default=128, help='dimensionality of the latent space')
     parser.add_argument('--beta1', type=int, default=0.9, help='wgangp optimizer parameter')
@@ -49,7 +53,7 @@ def main():
     train_unlable_genes = sample(unlabel_genes, int(len(unlabel_genes) * 0.8))
 
     positive_data = selected_data.loc[train_positive_genes].values
-    # unlabel_data = selected_data.loc[train_unlable_genes].values
+    unlabel_data = selected_data.loc[train_unlable_genes].values
 
     ft = open(os.path.join(DATA_DIR, "test_positive_genes.txt"), "w")
     fu = open(os.path.join(DATA_DIR, "test_negative_genes.txt"), "w")
@@ -64,7 +68,7 @@ def main():
     fu.close()
 
     args = {}
-    args["train_data"] = selected_data.loc[positive_genes].values
+    args["train_data"] = positive_data
     args["train_opt"] = opt
     args["g_sav_dir"] = MODEL_DIR_G
     args["d_sav_dir"] = MODEL_DIR_D

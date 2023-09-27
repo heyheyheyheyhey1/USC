@@ -6,12 +6,15 @@ from sklearn.metrics import *
 from random import shuffle
 from tqdm import tqdm
 import pickle
+from datetime import datetime
 
 DATA_DIR = os.path.join("data")
 MODEL_DIR = os.path.join("model")
-OUT_DIR = os.path.join("result")
+OUT_DIR = os.path.join("result", datetime.now().strftime("%Y-%m-%d %Hh%Mm"))
 CLASSIFIER_NAMES = ['GB', 'GNB', 'LR', 'RF', 'SVM']
-# CLASSIFIER_NAMES = [ 'SVM']
+
+if not os.path.exists(OUT_DIR):
+    os.makedirs(OUT_DIR)
 
 selected_data = "selected_dataset.tsv"
 dataset_matrix = os.path.join(DATA_DIR, selected_data)
@@ -22,8 +25,8 @@ positive_data = selected_data.loc[positive_genes].values
 negative_data = selected_data.loc[negative_genes].values
 shuffle(negative_data)
 
-columns = ['model', 'batch_n', 'Accuracy', "Precision", "Recall", "F1"]
-average_pred = pd.DataFrame(columns=columns)
+average_pred = pd.DataFrame(columns=['model', 'batch_n', 'Accuracy', "Precision", "Recall", "F1"])
+pd_results = pd.DataFrame(columns=['model', 'Accuracy', "Precision", "Recall", "F1"])
 
 
 def data_enumerator():
@@ -43,7 +46,8 @@ for classifier in tqdm(CLASSIFIER_NAMES):
         for x, y, i in data_enumerator():
             model = pickle.load(open(os.path.join(MODEL_DIR, classifier, mdl), 'rb'))
             pred = model.predict(x)
-            scorings = [classifier, f"batch_{i}", accuracy_score(y, pred), precision_score(y, pred), recall_score(y, pred),
+            scorings = [classifier, f"batch_{i}", accuracy_score(y, pred), precision_score(y, pred),
+                        recall_score(y, pred),
                         f1_score(y, pred)]
             average_pred.loc[len(average_pred)] = scorings
 
@@ -51,8 +55,13 @@ average_pred.round(4)
 
 for classifier in tqdm(CLASSIFIER_NAMES):
     test_pd = average_pred[average_pred["model"] == classifier].copy()
-    test_pd.loc[len(test_pd)] = test_pd.mean(numeric_only=True,skipna=True)
+    mean = test_pd.mean(numeric_only=True, skipna=True)
+    mean.loc["model"] = classifier
+    pd_results.loc[len(pd_results)] = mean
     test_pd.to_csv(os.path.join(OUT_DIR, f"{classifier}_GAN_test.csv"), index=True, sep="\t")
+
+pd_results.loc[len(pd_results)] = pd_results.mean()
+pd_results.to_csv(os.path.join(OUT_DIR, f"GAN_test.csv"), sep="\t", index=False)
 
 # average_pred.loc["mean"] = average_pred.mean(numeric_only=True)
 # average_pred.to_csv(os.path.join(OUT_DIR, "SVM_GAN_test.csv"), index=True)

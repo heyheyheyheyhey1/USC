@@ -10,6 +10,8 @@ from sklearn.model_selection import cross_val_score, cross_validate, LeaveOneOut
 from sklearn.metrics import make_scorer, accuracy_score, precision_score
 from sklearn.utils import shuffle
 
+from sklearn.manifold import TSNE
+
 
 class Discriminator(nn.Module):
     def __init__(self, in_dim):
@@ -112,6 +114,7 @@ class WGANGP():
 
     def draw(self):
         x = range(len(self.losses_D))
+        plt.clf()
         plt.plot(x, self.losses_D, label='D_loss')
         plt.plot(x, self.losses_G, label='G_loss')
         plt.xlabel('Epoch')
@@ -124,7 +127,7 @@ class WGANGP():
     def noise(self, num):
         return torch.rand([num, self.train_opt.latent_dim]).to(self.device)
 
-    def C2ST(self):
+    def C2ST(self, epoch_num):
         self.discriminator.eval()
         self.generator.eval()
         len = self.train_data.shape[0]
@@ -133,12 +136,25 @@ class WGANGP():
         c2st_y = np.concatenate([np.zeros([len, ]), np.ones([len, ])])
         c2st_x, c2st_y = shuffle(c2st_x, c2st_y)
         SVM_model = SVC()
-        loocv = LeaveOneOut()
         scorings = {'accuracy': make_scorer(accuracy_score),
                     'precision': make_scorer(precision_score),
                     }
         cv_result = cross_validate(SVM_model, c2st_x, c2st_y, scoring=scorings, cv=5)
-        return cv_result["test_accuracy"].mean(), cv_result["test_precision"].mean()
+        acc, prec = cv_result["test_accuracy"].mean(), cv_result["test_precision"].mean()
+
+        # if epoch_num%5 == 0 :
+        # tsne = TSNE(n_components=2, random_state=42, learning_rate=200, init="pca").fit_transform(c2st_x)
+        # plt.figure()
+        # plt.scatter(tsne[c2st_y == 1, 0], tsne[c2st_y == 1, 1], c="red")
+        # plt.scatter(tsne[c2st_y == 0, 0], tsne[c2st_y == 0, 1], c="green")
+        # plt.xlabel('x-tsne')
+        # plt.ylabel('y-tsne')
+        # # plt.legend(loc=4)
+        # # plt.grid(True)
+        # plt.tight_layout()
+        # plt.savefig(os.path.join("pics", f"tsne_epoch_{epoch_num}_c2st_{acc}.jpg"))
+
+        return acc, prec
 
     def train_one_epoch(self, n_epoch):
         epoch_losses_G = []
@@ -171,7 +187,7 @@ class WGANGP():
             loss_G.backward()
             self.optimizer_G.step()
             epoch_losses_G.append(loss_G)
-        acc, pric = self.C2ST()
+        acc, pric = self.C2ST(n_epoch)
         if abs(acc - 0.5) <= self.train_opt.stop_threshold:
             torch.save(self.generator.state_dict(),
                        os.path.join(self.g_save_dir,
