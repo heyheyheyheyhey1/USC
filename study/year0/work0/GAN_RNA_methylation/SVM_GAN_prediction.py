@@ -23,7 +23,7 @@ LATENT_DIM = 128
 CLASSIFIER_NAMES = ['SVM', 'GB', 'GNB', 'LR', 'RF']
 # CLASSIFIER_NAMES = ['SVM']
 generator = Generator(in_dim=LATENT_DIM, out_dim=1517)
-generator.load_state_dict(torch.load(os.path.join(MODEL_DIR, "wgangp", "generator", "generator_n_461_acc_0.484.pth")))
+generator.load_state_dict(torch.load(os.path.join(MODEL_DIR, "wgangp", "generator", "generator_n_574_acc_0.494.pth")))
 generator.eval()
 
 if not os.path.exists(CV_DIR):
@@ -61,10 +61,12 @@ cv_scorings = pd.DataFrame(columns=['Classifier', 'Accuracy', 'Precision', 'Reca
 
 def SVM_tuning(n, X_train, y_train):
     scores = ['accuracy']  # select scores e.g scores = ['recall', 'accuracy']
+    # grid_param_svm = [
+    #     {'kernel': ['rbf'], 'gamma': [1e-1, 1e-2, 1e-3, 1e-4], 'C': np.arange(0, 1501, 100)[1:]},
+    #     {'kernel': ['linear'], 'C': np.arange(0, 1501, 100)[1:]}, ]
     grid_param_svm = [
-        {'kernel': ['rbf'], 'gamma': [1e-1, 1e-2, 1e-3, 1e-4], 'C': np.arange(0, 1501, 100)[1:],
-         "class_weight": ["balanced"]},
-        {'kernel': ['linear'], 'C': np.arange(0, 1501, 100)[1:], "class_weight": ["balanced"]}, ]
+        {'kernel': ['rbf'], 'gamma': [1e-1, 1e-2, 1e-3, 1e-4], 'C': [1, 10, 100, 1000]},
+        {'kernel': ['linear'],'C': [1, 10, 100, 1000]}]
     svm_tuning_info = open(os.path.join(TUNING_DIR,'SVM', f'SVM_tuning_{n}.txt'), "w")
     for score in scores:
         svm_tuning = GridSearchCV(SVC(random_state=3), grid_param_svm, cv=KFold(3, shuffle=True, random_state=3),
@@ -270,7 +272,8 @@ def train_one_epoch(X, Y, n):
 
 def oversample(x, y):
     synthetic_num = abs(np.sum(y == 0) - np.sum(y == 1))
-    synthetic_data = generator(torch.rand(synthetic_num, LATENT_DIM))
+    with torch.no_grad():
+        synthetic_data = generator(torch.rand(synthetic_num, LATENT_DIM))
     x_os = np.concatenate([synthetic_data.detach(), x]).copy()
     y_os = np.concatenate([np.ones([synthetic_num, ]), y]).copy()
     return x_os, y_os
@@ -287,7 +290,7 @@ def data_block_n(i, batch_size):
 
 
 def main():
-    os_rate = 0.5
+    os_rate = 0.6
     ir = float(len(train_negative_genes) / len(train_positive_genes))
     epoch_num = int(ir * os_rate)
     batch_size = int(len(train_negative_genes) / epoch_num)

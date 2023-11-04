@@ -19,7 +19,7 @@ SAVE_DIR = os.path.join(MODEL_DIR,"DNN")
 DATA_DIR = os.path.join("data")
 LATENT_DIM = 128
 generator = Generator(in_dim=LATENT_DIM, out_dim=1517)
-generator.load_state_dict(torch.load(os.path.join(MODEL_DIR, "wgangp", "generator", "generator_n_3123_acc_0.486.pth")))
+generator.load_state_dict(torch.load(os.path.join(MODEL_DIR, "wgangp", "generator", "generator_n_283_acc_0.507.pth")))
 generator.eval()
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
@@ -119,19 +119,25 @@ def train_one_epoch(n_epoch):
         loss.backward()
         optimizer.step()
     model.eval()
+    cv_scorings = pd.DataFrame(columns=[ 'Accuracy', 'Precision', 'Recall', 'F1'])
     with torch.no_grad():
-        print(f'\n evaluating epoch {n_epoch} ...')
         for X, Y, _ in dataset():
             X, Y = shuffle(X, Y)
             y_hat = model(X)
-            y_hat = torch.argmax(y_hat)
-        pass
-
+            y_hat = torch.argmax(y_hat,dim=-1).cpu()
+            y_true = torch.argmax(Y,dim=-1).cpu()
+            scorings = [accuracy_score(y_true, y_hat), precision_score(y_true, y_hat),
+                        recall_score(y_true, y_hat),
+                        f1_score(y_true, y_hat),
+                        ]
+            cv_scorings.loc[len(cv_scorings)] = scorings
+        mean = cv_scorings.mean()
+        print(f"\nepoch {n_epoch}: [acc:{mean.loc['Accuracy']:.3f}] [prec:{mean.loc['Precision']:.3f}] [recall:{mean.loc['Recall']:.3f}] [F1:{mean.loc['F1']:.3f}]"  )
 
 def main():
     os_rate = 0.6
     ir = float(len(train_negative_genes) / len(train_positive_genes))
-    epoch_num = int(ir * os_rate)
+    epoch_num = 2000
     batch_size = int(len(train_negative_genes) / epoch_num)
 
     for i in tqdm.tqdm(range(epoch_num)):

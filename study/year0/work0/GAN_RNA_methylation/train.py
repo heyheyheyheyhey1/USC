@@ -26,10 +26,10 @@ if not os.path.exists(MODEL_DIR_D):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--n_epochs', type=int, default=5000, help='number of epochs of training')
+    parser.add_argument('--n_epochs', type=int, default=2000, help='number of epochs of training')
     parser.add_argument('--batch_size', type=int, default=73, help='size of the batches')
     parser.add_argument('--lr', type=float, default=0.00005, help='learning rate')
-    parser.add_argument('--lr_g', type=float, default=0.0001, help='learning rate g')
+    parser.add_argument('--lr_g', type=float, default=0.00005, help='learning rate g')
     parser.add_argument('--lr_d', type=float, default=0.00005, help='learning rate d')
     parser.add_argument('--n_critic', type=int, default=50, help='number of training steps for discriminator per iter')
     parser.add_argument('--clip_value', type=float, default=0.01, help='lower and upper clip value for disc. weights')

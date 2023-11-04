@@ -25,8 +25,8 @@ positive_data = selected_data.loc[positive_genes].values
 negative_data = selected_data.loc[negative_genes].values
 shuffle(negative_data)
 
-average_pred = pd.DataFrame(columns=['model', 'batch_n', 'Accuracy', "Precision", "Recall", "F1"])
-pd_results = pd.DataFrame(columns=['model', 'Accuracy', "Precision", "Recall", "F1"])
+average_pred = pd.DataFrame(columns=['model', 'batch_n', 'Accuracy', "Precision", "Recall", "F1", "MCC"])
+pd_results = pd.DataFrame(columns=['model', 'Accuracy', "Precision", "Recall", "F1", "MCC"])
 
 
 def data_enumerator():
@@ -48,7 +48,8 @@ for classifier in tqdm(CLASSIFIER_NAMES):
             pred = model.predict(x)
             scorings = [classifier, f"batch_{i}", accuracy_score(y, pred), precision_score(y, pred),
                         recall_score(y, pred),
-                        f1_score(y, pred)]
+                        f1_score(y, pred),
+                        matthews_corrcoef(y,pred)]
             average_pred.loc[len(average_pred)] = scorings
 
 average_pred.round(4)
@@ -61,7 +62,7 @@ for classifier in tqdm(CLASSIFIER_NAMES):
     test_pd.to_csv(os.path.join(OUT_DIR, f"{classifier}_GAN_test.csv"), index=True, sep="\t")
 
 pd_results.loc[len(pd_results)] = pd_results.mean()
-pd_results.to_csv(os.path.join(OUT_DIR, f"GAN_test.csv"), sep="\t", index=False)
+pd_results.to_csv(os.path.join(OUT_DIR, f"GAN_test_mcc.csv"), sep="\t", index=False)
 
 # average_pred.loc["mean"] = average_pred.mean(numeric_only=True)
 # average_pred.to_csv(os.path.join(OUT_DIR, "SVM_GAN_test.csv"), index=True)
