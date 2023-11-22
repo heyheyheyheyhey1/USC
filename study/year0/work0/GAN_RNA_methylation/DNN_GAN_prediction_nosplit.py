@@ -4,6 +4,8 @@ from torch import nn
 from datetime import datetime
 from WGANGP import Generator
 import pandas as pd
+from torch.utils.data import DataLoader
+from torch.utils.data import Dataset
 import pickle
 import os
 from sklearn.utils import shuffle
@@ -48,15 +50,6 @@ train_negative_frame = selected_data.loc[list(train_negative_genes)]
 print("all genes num: %d\n" % (len(all_genes)))
 print("test genes num: %d\n" % (len(test_negative_genes) + len(test_positive_genes)))
 
-os_rate = 0.6
-ir = float(len(train_negative_genes) / len(train_positive_genes))
-epoch_num = 20000
-
-train_X = np.concatenate([train_positive_frame.values, train_negative_frame.values])
-train_Y = train_X[:, -1]
-train_X = train_X[:, 0:-1]
-
-
 def initialize_weights(m):
     if isinstance(m, nn.Linear):
         torch.nn.init.kaiming_normal_(m.weight.data)
@@ -96,56 +89,70 @@ def oversample(x, y):
     y_os = np.concatenate([np.ones([synthetic_num, ]), y]).copy()
     return x_os, y_os
 
+class RMNT_DATA(Dataset):
+    def __init__(self, data, labels):
+        self.data = data
+        self.labels = labels
 
-def dataset(neg_num_per_block):
-    negtv_num = len(train_negative_genes)
-    for i in range(negtv_num // neg_num_per_block):
-        neg_batch = train_negative_frame.iloc[i * neg_num_per_block:(i + 1) * neg_num_per_block]
-        block = pd.concat([neg_batch, train_positive_frame], axis=0)
-        block_y = block.iloc[:, -1].values
-        block_x = block.iloc[:, 0:-1].values
-        os_x, os_y = oversample(block_x, block_y)
-        out_x, out_y = shuffle(os_x, os_y)
+    def __len__(self):
+        return len(self.data)
 
-        yield torch.Tensor(out_x).to(device), torch.Tensor(np.eye(2)[out_y.astype(int)]).to(device), i
+    def __getitem__(self, index):
+        # 获取索引为index的样本和标签
+        sample = self.data[index]
+        label = self.labels[index]
+
+        # 将样本和标签转换为Tensor格式
+        sample = torch.Tensor(sample).to(device)
+        label = torch.Tensor(np.eye(2)[label.astype(int)]).to(device)
+
+        return sample, label
 
 
-def val_set():
-    postv_num = len(test_positive_genes)
-    negtv_num = len(test_negative_genes)
-    val_neg_data = selected_data.loc[test_negative_genes]
-    val_pos_data = selected_data.loc[test_positive_genes]
-    for i in range(int(negtv_num / postv_num)):
-        neg_batch = val_neg_data.values[i * postv_num:(i + 1) * postv_num, 0:-1]
-        x = np.concatenate([np.array(neg_batch), val_pos_data.values[:, 0:-1]])
-        y0 = np.zeros([len(neg_batch), ])
-        y1 = np.ones([postv_num, ])
-        y = np.concatenate([y0, y1], axis=0)
-        yield torch.Tensor(x).to(device), torch.Tensor(np.eye(2)[y.astype(int)]).to(device), i
+def dataset():
+    rnmt_data = pd.concat([train_negative_frame, train_positive_frame], axis=0)
+    rnmt_data_y = rnmt_data.iloc[:, -1].values
+    rnmt_data_x = rnmt_data.iloc[:, 0:-1].values
+    os_x, os_y = oversample(rnmt_data_x, rnmt_data_y)
+    return RMNT_DATA(os_x,os_y)
+
 
 # def val_set():
-#     postv_num = len(train_positive_genes)
-#     negtv_num = len(train_negative_genes)
+#     postv_num = len(test_positive_genes)
+#     negtv_num = len(test_negative_genes)
+#     val_neg_data = selected_data.loc[test_negative_genes]
+#     val_pos_data = selected_data.loc[test_positive_genes]
 #     for i in range(int(negtv_num / postv_num)):
-#         neg_batch = train_negative_frame.values[i * postv_num:(i + 1) * postv_num,0:-1]
-#         x = np.concatenate([np.array(neg_batch), train_positive_frame.values[:,0:-1]])
+#         neg_batch = val_neg_data.values[i * postv_num:(i + 1) * postv_num, 0:-1]
+#         x = np.concatenate([np.array(neg_batch), val_pos_data.values[:, 0:-1]])
 #         y0 = np.zeros([len(neg_batch), ])
 #         y1 = np.ones([postv_num, ])
 #         y = np.concatenate([y0, y1], axis=0)
 #         yield torch.Tensor(x).to(device), torch.Tensor(np.eye(2)[y.astype(int)]).to(device), i
+
+def val_set():
+    postv_num = len(train_positive_genes)
+    negtv_num = len(train_negative_genes)
+    for i in range(int(negtv_num / postv_num)):
+        neg_batch = train_negative_frame.values[i * postv_num:(i + 1) * postv_num,0:-1]
+        x = np.concatenate([np.array(neg_batch), train_positive_frame.values[:,0:-1]])
+        y0 = np.zeros([len(neg_batch), ])
+        y1 = np.ones([postv_num, ])
+        y = np.concatenate([y0, y1], axis=0)
+        yield torch.Tensor(x).to(device), torch.Tensor(np.eye(2)[y.astype(int)]).to(device), i
 
 model = RNMT_NET(in_dim=1517).apply(initialize_weights)
 model.to(device)
 criterion = nn.BCELoss()
 optimizer = torch.optim.Adam(model.parameters(), lr=0.0001)
 random.seed(42)
-cv_scorings = pd.DataFrame(columns=['Classifier', 'Accuracy', 'Precision', 'Recall', 'F1', 'AUC'])
+batch_size = 500
+dataloader = DataLoader(dataset(),batch_size=batch_size,shuffle=True)
 
-
-def train_one_epoch(n_epoch, neg_num_per_block):
+def train_one_epoch(n_epoch):
     model.train()
     losses = []
-    for X, Y, _ in dataset(neg_num_per_block):
+    for X, Y in dataloader:
         optimizer.zero_grad()
         X, Y = shuffle(X, Y)
         y_hat = model(X)
@@ -173,12 +180,8 @@ def train_one_epoch(n_epoch, neg_num_per_block):
 
 def main():
     epoch_num = 800
-    os_rate = 0.1
-    ir = float(len(train_negative_genes) / len(train_positive_genes))
-    neg_num_per_block = len(train_negative_genes) // (ir * os_rate)
-
     for i in tqdm.tqdm(range(epoch_num)):
-        train_one_epoch(i, int(neg_num_per_block))
+        train_one_epoch(i)
     torch.save(model.state_dict(),
                os.path.join(SAVE_DIR, f'rnmt_net_{datetime.now().strftime("%Y-%m-%d %Hh%Mm")}.pth'))
 
